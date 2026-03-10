@@ -47,9 +47,10 @@ model Property {
   imageUrl         String?
   airbnbIcalUrl    String?
   vrboIcalUrl      String?
-  cleaningDuration Int
-  cleaningFee      Float     @default(0)
-  lastSyncedAt     DateTime?
+  cleaningDuration     Int
+  cleaningFee          Float     @default(0)
+  accessInstructions   String?
+  lastSyncedAt         DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

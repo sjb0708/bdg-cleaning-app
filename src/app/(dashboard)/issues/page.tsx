@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/components/layout/Providers"
 import { Header } from "@/components/layout/Header"
 import { Card } from "@/components/ui/Card"
 import { Spinner } from "@/components/ui/Spinner"
@@ -34,6 +35,8 @@ const FILTERS = ["ALL", "OPEN", "REVIEWED", "RESOLVED"]
 
 export default function IssuesPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = user?.role === "ADMIN"
   const [issues, setIssues] = useState<IssueReport[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("ALL")
@@ -52,8 +55,8 @@ export default function IssuesPage() {
   return (
     <div className="min-h-screen">
       <Header
-        title="Issue Reports"
-        subtitle="Damages and issues reported by cleaners"
+        title={isAdmin ? "Issue Reports" : "My Reports"}
+        subtitle={isAdmin ? "Damages and issues reported by your cleaners" : "Issues you've reported on jobs"}
       />
 
       {loading ? (

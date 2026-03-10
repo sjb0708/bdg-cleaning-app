@@ -434,6 +434,12 @@ function CleanerJobsView() {
                 <Link href={`/jobs/${job.id}`}>
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm active:scale-[0.99] transition-transform">
                     <div className="p-4">
+                      {job.status === "PENDING_ACCEPTANCE" && (
+                        <div className="mb-3 flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
+                          <AlertCircle className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                          <span className="text-xs font-semibold text-purple-700">Action required — tap to accept or decline</span>
+                        </div>
+                      )}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-slate-900 text-base truncate">

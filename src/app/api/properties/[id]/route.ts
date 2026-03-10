@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.cleaningDuration !== undefined) updateData.cleaningDuration = parseInt(body.cleaningDuration)
     if (body.cleaningFee !== undefined) updateData.cleaningFee = parseFloat(body.cleaningFee) || 0
     if (body.imageUrl !== undefined) updateData.imageUrl = body.imageUrl || null
+    if (body.accessInstructions !== undefined) updateData.accessInstructions = body.accessInstructions || null
 
     const property = await prisma.property.update({
       where: { id },

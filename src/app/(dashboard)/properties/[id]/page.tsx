@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/Header"
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
-import { Input } from "@/components/ui/Input"
+import { Input, Textarea } from "@/components/ui/Input"
 import { Spinner } from "@/components/ui/Spinner"
 import { motion } from "framer-motion"
 import {
@@ -42,7 +42,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [collapsedRooms, setCollapsedRooms] = useState<Set<string>>(new Set())
 
   // Edit property fields
-  const [editForm, setEditForm] = useState({ airbnbIcalUrl: "", vrboIcalUrl: "", cleaningDuration: "", cleaningFee: "" })
+  const [editForm, setEditForm] = useState({ airbnbIcalUrl: "", vrboIcalUrl: "", cleaningDuration: "", cleaningFee: "", accessInstructions: "" })
   const [editingSettings, setEditingSettings] = useState(false)
 
   useEffect(() => {
@@ -57,6 +57,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           vrboIcalUrl: prop.vrboIcalUrl || "",
           cleaningDuration: String(prop.cleaningDuration),
           cleaningFee: String(prop.cleaningFee ?? 0),
+          accessInstructions: prop.accessInstructions || "",
         })
         const template = prop.checklistTemplate
         if (template?.items?.length) {
@@ -257,6 +258,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 min="0"
                 step="0.01"
                 onChange={(e) => setEditForm((f) => ({ ...f, cleaningFee: e.target.value }))} />
+              <Textarea
+                label="Entry / Access Instructions"
+                placeholder="e.g. Key lockbox code is 1234, located on front gate. Ring doorbell on arrival."
+                rows={3}
+                value={editForm.accessInstructions}
+                onChange={(e) => setEditForm((f) => ({ ...f, accessInstructions: e.target.value }))}
+              />
               <Button onClick={saveSettings} loading={saving} size="sm">
                 <Save className="w-4 h-4" /> Save Settings
               </Button>

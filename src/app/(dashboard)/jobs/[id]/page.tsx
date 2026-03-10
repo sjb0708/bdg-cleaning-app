@@ -947,7 +947,42 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
         </div>
       </motion.div>
 
-      {/* Notes */}
+      {/* Pay + Access Info */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-4">
+          {/* Pay */}
+          {job.property?.cleaningFee ? (
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Pay for this job</p>
+                <p className="text-sm font-bold text-emerald-700">${job.property.cleaningFee.toFixed(2)}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Access instructions */}
+          {job.property?.accessInstructions && (
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                <FileText className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Entry / Access Instructions</p>
+                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                  {job.property.accessInstructions}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!job.property?.cleaningFee && !job.property?.accessInstructions && (
+            <p className="text-sm text-slate-400 text-center py-1">No additional details from host.</p>
+          )}
+        </div>
+      </motion.div>
 
       {/* Checklist */}
       {checklist.length > 0 && (

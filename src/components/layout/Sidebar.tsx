@@ -39,6 +39,7 @@ const cleanerNav = [
   { href: "/dashboard", label: "My Jobs", icon: LayoutDashboard },
   { href: "/jobs", label: "All Jobs", icon: Briefcase },
   { href: "/payments", label: "Earnings", icon: TrendingUp },
+  { href: "/issues", label: "My Reports", icon: TriangleAlert },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
