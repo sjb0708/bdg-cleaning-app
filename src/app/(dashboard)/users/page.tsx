@@ -1,0 +1,408 @@
+"use client"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/components/layout/Providers"
+import { Header } from "@/components/layout/Header"
+import { Card, CardHeader, CardTitle } from "@/components/ui/Card"
+import { Avatar } from "@/components/ui/Avatar"
+import { Button } from "@/components/ui/Button"
+import { Spinner } from "@/components/ui/Spinner"
+import { Modal } from "@/components/ui/Modal"
+import { Input } from "@/components/ui/Input"
+import { formatDate } from "@/lib/utils"
+import type { User } from "@/types"
+import {
+  UserCheck, UserX, Users, Mail, Phone, MapPin,
+  Plus, Copy, CheckCircle2, AlertCircle, Shield,
+} from "lucide-react"
+import { motion } from "framer-motion"
+
+const stagger = { visible: { transition: { staggerChildren: 0.07 } } }
+const fadeUp = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }
+
+// ─── Invite Admin Modal ───────────────────────────────────────────────────────
+
+interface InviteModalProps {
+  open: boolean
+  onClose: () => void
+}
+
+function InviteAdminModal({ open, onClose }: InviteModalProps) {
+  const [email, setEmail] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState("")
+
+  function reset() {
+    setEmail("")
+    setInviteUrl(null)
+    setCopied(false)
+    setError("")
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError("")
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(d.error ?? "Failed to create invite.")
+        return
+      }
+      setInviteUrl(d.inviteUrl ?? d.url ?? d.link ?? JSON.stringify(d))
+    } catch {
+      setError("Something went wrong.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function copyUrl() {
+    if (!inviteUrl) return
+    await navigator.clipboard.writeText(inviteUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => { reset(); onClose() }}
+      title="Invite Admin"
+      description="Send an invite link for a new admin account"
+    >
+      <div className="p-6 space-y-4">
+        {!inviteUrl ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Email Address"
+              type="email"
+              placeholder="admin@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              icon={Mail}
+              required
+            />
+            {error && (
+              <p className="text-sm text-red-600 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4" /> {error}
+              </p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => { reset(); onClose() }}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? <Spinner size="sm" /> : "Generate Invite"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+              <p className="text-sm font-medium text-emerald-800">Invite link created!</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-600 mb-2">Share this link:</p>
+              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <p className="text-xs text-slate-700 flex-1 break-all font-mono">{inviteUrl}</p>
+                <button
+                  onClick={copyUrl}
+                  className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors flex-shrink-0"
+                >
+                  {copied ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-slate-500" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <Button className="w-full" variant="outline" onClick={() => { reset(); onClose() }}>
+              Done
+            </Button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// ─── User card ────────────────────────────────────────────────────────────────
+
+interface UserCardProps {
+  user: User
+  pending?: boolean
+  onApprove?: (id: string) => void
+  onReject?: (id: string) => void
+  onDeactivate?: (id: string) => void
+  actionLoading?: string | null
+}
+
+function UserCard({ user, pending, onApprove, onReject, onDeactivate, actionLoading }: UserCardProps) {
+  const loading = actionLoading === user.id
+
+  return (
+    <motion.div variants={fadeUp}>
+      <Card hover={false} padding="none">
+        <div className="p-4 flex items-start gap-4">
+          <Avatar name={user.name} size="lg" className="flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div>
+                <p className="font-semibold text-slate-900">{user.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                    user.role === "ADMIN"
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-blue-100 text-blue-700"
+                  }`}>
+                    {user.role === "ADMIN" ? "Admin" : "Cleaner"}
+                  </span>
+                  {!user.approved && (
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">
+                      Pending
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">{formatDate(user.createdAt)}</p>
+            </div>
+
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                {user.email}
+              </div>
+              {user.phone && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <Phone className="w-3.5 h-3.5 text-slate-400" />
+                  {user.phone}
+                </div>
+              )}
+              {user.location && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  {user.location}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            {(pending || onDeactivate) && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {pending && onApprove && (
+                  <Button
+                    size="sm"
+                    onClick={() => onApprove(user.id)}
+                    disabled={loading}
+                  >
+                    {loading ? <Spinner size="sm" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    Approve
+                  </Button>
+                )}
+                {pending && onReject && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => onReject(user.id)}
+                    disabled={loading}
+                  >
+                    {loading ? <Spinner size="sm" /> : <UserX className="w-3.5 h-3.5" />}
+                    Reject
+                  </Button>
+                )}
+                {!pending && onDeactivate && user.role === "CLEANER" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-slate-500"
+                    onClick={() => onDeactivate(user.id)}
+                    disabled={loading}
+                  >
+                    {loading ? <Spinner size="sm" /> : null}
+                    Deactivate
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function UsersPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "ADMIN"
+
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
+
+  async function loadUsers() {
+    try {
+      const res = await fetch("/api/users")
+      if (res.ok) {
+        const d = await res.json()
+        setUsers(d.users ?? d)
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadUsers() }, [])
+
+  async function handleApprove(id: string) {
+    setActionLoading(id)
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved: true }),
+      })
+      if (res.ok) {
+        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, approved: true } : u))
+      }
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleReject(id: string) {
+    if (!confirm("Remove this cleaner?")) return
+    setActionLoading(id)
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: "DELETE" })
+      if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== id))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDeactivate(id: string) {
+    if (!confirm("Deactivate this cleaner? They will no longer be able to log in.")) return
+    setActionLoading(id)
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved: false }),
+      })
+      if (res.ok) {
+        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, approved: false } : u))
+      }
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const pending = users.filter((u) => u.role === "CLEANER" && !u.approved)
+  const team = users.filter((u) => u.approved || u.role === "ADMIN")
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen">
+        <Header title="Team" subtitle="Admin access only" />
+        <div className="flex items-center justify-center min-h-[400px] text-slate-500">
+          <p>You don't have permission to view this page.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen">
+      <Header
+        title="Team"
+        subtitle={`${team.length} member${team.length !== 1 ? "s" : ""}${pending.length ? ` · ${pending.length} pending` : ""}`}
+        actions={
+          <Button size="sm" onClick={() => setShowInvite(true)}>
+            <Plus className="w-4 h-4" /> Invite Admin
+          </Button>
+        }
+      />
+
+      <div className="p-6 max-w-3xl space-y-8">
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <>
+            {/* Pending approval */}
+            {pending.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 bg-amber-400 rounded-full" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Pending Approval
+                    <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 rounded-full">
+                      {pending.length}
+                    </span>
+                  </h2>
+                </div>
+                <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-3">
+                  {pending.map((u) => (
+                    <UserCard
+                      key={u.id}
+                      user={u}
+                      pending
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      actionLoading={actionLoading}
+                    />
+                  ))}
+                </motion.div>
+              </section>
+            )}
+
+            {/* Team members */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="w-4 h-4 text-slate-400" />
+                <h2 className="text-base font-bold text-slate-900">Team Members</h2>
+              </div>
+
+              {team.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 text-slate-200" />
+                  <p className="font-medium">No team members yet</p>
+                  <p className="text-sm mt-1">Approve cleaners above or invite an admin.</p>
+                </div>
+              ) : (
+                <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-3">
+                  {team.map((u) => (
+                    <UserCard
+                      key={u.id}
+                      user={u}
+                      onDeactivate={handleDeactivate}
+                      actionLoading={actionLoading}
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+
+      <InviteAdminModal open={showInvite} onClose={() => setShowInvite(false)} />
+    </div>
+  )
+}

@@ -1,308 +1,283 @@
 import "dotenv/config"
 import { PrismaClient } from "../src/generated/prisma/client"
 import { PrismaNeon } from "@prisma/adapter-neon"
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
 import bcrypt from "bcryptjs"
 
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
-const prisma = new PrismaClient({ adapter })
+const url = process.env.DATABASE_URL!
+let prisma: PrismaClient
+
+if (url.startsWith("file:")) {
+  const adapter = new PrismaBetterSqlite3({ url })
+  prisma = new PrismaClient({ adapter })
+} else {
+  const adapter = new PrismaNeon({ connectionString: url })
+  prisma = new PrismaClient({ adapter })
+}
+
+function d(year: number, month: number, day: number, hour = 11, min = 0) {
+  return new Date(year, month - 1, day, hour, min)
+}
 
 async function main() {
   console.log("Seeding database...")
 
   // Clear existing data
-  await prisma.review.deleteMany()
+  await prisma.payment.deleteMany()
+  await prisma.notification.deleteMany()
   await prisma.checklistItem.deleteMany()
+  await prisma.checklistTemplateItem.deleteMany()
+  await prisma.checklistTemplate.deleteMany()
   await prisma.job.deleteMany()
+  await prisma.booking.deleteMany()
   await prisma.property.deleteMany()
   await prisma.user.deleteMany()
 
-  // Hash password
-  const pw = await bcrypt.hash("password123", 12)
+  const pw = await bcrypt.hash("Admin1234!", 12)
+  const cleanerPw = await bcrypt.hash("Cleaner123!", 12)
 
-  // Create hosts
-  const sarah = await prisma.user.create({
+  // Admin
+  const steve = await prisma.user.create({
     data: {
-      name: "Sarah Johnson",
-      email: "sarah@example.com",
+      name: "Steve Bailey",
+      email: "stevebailey130@gmail.com",
       password: pw,
-      role: "HOST",
-      phone: "(305) 555-0142",
-      location: "Miami Beach, FL",
-      bio: "Airbnb Superhost with 8 properties across South Florida and the Southeast. I take pride in providing exceptional guest experiences.",
-      avatarUrl: null,
-      rating: 4.9,
-      reviewCount: 89,
+      role: "ADMIN",
+      approved: true,
     },
   })
 
-  const mike = await prisma.user.create({
-    data: {
-      name: "Mike Thompson",
-      email: "mike@example.com",
-      password: pw,
-      role: "HOST",
-      phone: "(305) 555-0198",
-      location: "Key West, FL",
-      bio: "VRBO host with 3 properties in the Florida Keys. Love hosting families and couples looking for a paradise getaway.",
-      avatarUrl: null,
-      rating: 4.85,
-      reviewCount: 54,
-    },
-  })
-
-  // Create cleaners
-  const maria = await prisma.user.create({
+  // Mock cleaners
+  const cleaner1 = await prisma.user.create({
     data: {
       name: "Maria Garcia",
-      email: "maria@example.com",
-      password: pw,
+      email: "maria@cleaners.com",
+      password: cleanerPw,
       role: "CLEANER",
-      phone: "(305) 555-0187",
-      location: "Miami, FL",
-      bio: "Experienced vacation rental specialist with 6 years in South Florida. I pay close attention to detail and always leave properties spotless.",
-      hourlyRate: 28,
-      rating: 4.97,
-      reviewCount: 147,
+      approved: true,
+      phone: "352-555-0101",
     },
   })
 
-  const david = await prisma.user.create({
+  const cleaner2 = await prisma.user.create({
     data: {
-      name: "David Chen",
-      email: "david@example.com",
-      password: pw,
+      name: "James Wilson",
+      email: "james@cleaners.com",
+      password: cleanerPw,
       role: "CLEANER",
-      phone: "(312) 555-0234",
-      location: "Chicago, IL",
-      bio: "Professional cleaner specializing in downtown condos and lofts. Certified in hospitality standards.",
-      hourlyRate: 26,
-      rating: 4.92,
-      reviewCount: 98,
+      approved: true,
+      phone: "352-555-0202",
     },
   })
 
-  const emma = await prisma.user.create({
+  // Pending cleaner (not yet approved)
+  await prisma.user.create({
     data: {
-      name: "Emma Wilson",
-      email: "emma@example.com",
-      password: pw,
+      name: "Sofia Chen",
+      email: "sofia@cleaners.com",
+      password: cleanerPw,
       role: "CLEANER",
-      phone: "(305) 555-0156",
-      location: "Key West, FL",
-      bio: "Former hotel housekeeper with 8 years experience. Reliable, punctual, and thorough.",
-      hourlyRate: 25,
-      rating: 4.88,
-      reviewCount: 73,
+      approved: false,
     },
   })
 
-  const james = await prisma.user.create({
-    data: {
-      name: "James Martinez",
-      email: "james@example.com",
-      password: pw,
-      role: "CLEANER",
-      phone: "(480) 555-0312",
-      location: "Scottsdale, AZ",
-      bio: "Luxury property specialist with expertise in high-end vacation homes. Fully insured and bonded.",
-      hourlyRate: 30,
-      rating: 4.94,
-      reviewCount: 124,
-    },
-  })
-
-  const lisa = await prisma.user.create({
-    data: {
-      name: "Lisa Park",
-      email: "lisa@example.com",
-      password: pw,
-      role: "CLEANER",
-      phone: "(530) 555-0089",
-      location: "Lake Tahoe, CA",
-      bio: "Mountain cabin and lakefront property expert. Available weekdays and weekends.",
-      hourlyRate: 32,
-      rating: 4.99,
-      reviewCount: 61,
-    },
-  })
-
-  // Create properties
+  // Properties
   const p1 = await prisma.property.create({
     data: {
-      hostId: sarah.id,
-      name: "Oceanview Retreat",
-      address: "1247 Collins Ave",
-      city: "Miami Beach",
+      hostId: steve.id,
+      name: "Beautiful Home with Pool Near HITS",
+      address: "1234 SW 80th Ave",
+      city: "Ocala",
       state: "FL",
-      bedrooms: 4,
-      bathrooms: 3,
-      description: "Stunning oceanfront property with 4 bedrooms, private pool, and breathtaking views of the Atlantic.",
-      imageUrl: "https://picsum.photos/seed/oceanview/800/500",
+      bedrooms: 3,
+      bathrooms: 2,
+      description: "Beautiful 3-bed vacation rental with a private pool, close to HITS showgrounds.",
+      airbnbIcalUrl: null,
+      vrboIcalUrl: null,
       cleaningDuration: 180,
-      cleaningRate: 185,
-      platform: "AIRBNB",
-      icalUrl: "https://www.airbnb.com/calendar/ical/example1.ics",
+      cleaningFee: 120,
     },
   })
 
   const p2 = await prisma.property.create({
     data: {
-      hostId: sarah.id,
-      name: "Downtown Loft",
-      address: "820 N Michigan Ave",
-      city: "Chicago",
-      state: "IL",
-      bedrooms: 2,
-      bathrooms: 2,
-      description: "Modern industrial loft in the heart of Chicago with stunning skyline views.",
-      imageUrl: "https://picsum.photos/seed/loft/800/500",
-      cleaningDuration: 120,
-      cleaningRate: 120,
-      platform: "VRBO",
-    },
-  })
-
-  const p3 = await prisma.property.create({
-    data: {
-      hostId: sarah.id,
-      name: "Mountain Cabin Retreat",
-      address: "44 Pisgah Forest Rd",
-      city: "Asheville",
-      state: "NC",
-      bedrooms: 3,
-      bathrooms: 2.5,
-      description: "Cozy mountain cabin with hot tub, fireplace, and panoramic Blue Ridge Mountain views.",
-      imageUrl: "https://picsum.photos/seed/cabin/800/500",
-      cleaningDuration: 240,
-      cleaningRate: 220,
-      platform: "AIRBNB",
-    },
-  })
-
-  const p4 = await prisma.property.create({
-    data: {
-      hostId: mike.id,
-      name: "Beachside Bungalow",
-      address: "392 Duval St",
-      city: "Key West",
+      hostId: steve.id,
+      name: "Spacious Home with Pool Near HITS",
+      address: "5678 NE 14th St",
+      city: "Ocala",
       state: "FL",
-      bedrooms: 2,
-      bathrooms: 1,
-      description: "Charming Key West bungalow steps from Duval Street and the beach.",
-      imageUrl: "https://picsum.photos/seed/bungalow/800/500",
-      cleaningDuration: 150,
-      cleaningRate: 160,
-      platform: "VRBO",
+      bedrooms: 4,
+      bathrooms: 3,
+      description: "Spacious 4-bed home with pool, perfect for families visiting the equestrian events.",
+      airbnbIcalUrl: null,
+      vrboIcalUrl: null,
+      cleaningDuration: 240,
+      cleaningFee: 225,
     },
   })
 
-  const p5 = await prisma.property.create({
-    data: {
-      hostId: mike.id,
-      name: "Sunset Villa",
-      address: "5019 Camelback Rd",
-      city: "Scottsdale",
-      state: "AZ",
-      bedrooms: 5,
-      bathrooms: 4,
-      description: "Luxury desert villa with resort-style pool and stunning Camelback Mountain views.",
-      imageUrl: "https://picsum.photos/seed/villa/800/500",
-      cleaningDuration: 300,
-      cleaningRate: 285,
-      platform: "AIRBNB",
-    },
+  // Checklist templates
+  const defaultRooms = (bedrooms: number, bathrooms: number) => {
+    const items: { label: string; room: string; order: number }[] = [
+      { label: "Vacuum all floors", room: "General", order: 0 },
+      { label: "Mop hard floors", room: "General", order: 1 },
+      { label: "Empty all trash cans", room: "General", order: 2 },
+      { label: "Wipe down all light switches and door handles", room: "General", order: 3 },
+      { label: "Clean kitchen counters and appliances", room: "Kitchen", order: 4 },
+      { label: "Clean inside microwave", room: "Kitchen", order: 5 },
+      { label: "Wipe down stovetop and oven", room: "Kitchen", order: 6 },
+      { label: "Clean and sanitize sink", room: "Kitchen", order: 7 },
+      { label: "Restock dish soap and sponge", room: "Kitchen", order: 8 },
+    ]
+    for (let i = 1; i <= bedrooms; i++) {
+      const room = i === 1 ? "Master Bedroom" : `Bedroom ${i}`
+      items.push(
+        { label: "Make bed with fresh linens", room, order: items.length },
+        { label: "Dust all surfaces", room, order: items.length + 1 },
+        { label: "Wipe down nightstands", room, order: items.length + 2 },
+      )
+    }
+    const bathCount = Math.ceil(bathrooms)
+    for (let i = 1; i <= bathCount; i++) {
+      const room = i === 1 ? "Master Bathroom" : `Bathroom ${i}`
+      items.push(
+        { label: "Clean and disinfect toilet", room, order: items.length },
+        { label: "Clean shower/tub", room, order: items.length + 1 },
+        { label: "Clean sink and mirror", room, order: items.length + 2 },
+        { label: "Replace towels and toiletries", room, order: items.length + 3 },
+      )
+    }
+    items.push({ label: "Final walkthrough", room: "General", order: items.length })
+    return items
+  }
+
+  await prisma.checklistTemplate.create({
+    data: { propertyId: p1.id, items: { create: defaultRooms(p1.bedrooms, p1.bathrooms) } },
+  })
+  await prisma.checklistTemplate.create({
+    data: { propertyId: p2.id, items: { create: defaultRooms(p2.bedrooms, p2.bathrooms) } },
   })
 
-  // Checklist template
-  const checklist = [
-    { label: "Vacuum all floors", room: "General" },
-    { label: "Mop hard floors", room: "General" },
-    { label: "Clean bathrooms", room: "Bathroom" },
-    { label: "Replace towels and toiletries", room: "Bathroom" },
-    { label: "Make all beds with fresh linens", room: "Bedroom" },
-    { label: "Dust all surfaces", room: "Bedroom" },
-    { label: "Clean kitchen counters and appliances", room: "Kitchen" },
-    { label: "Empty all trash cans", room: "General" },
-    { label: "Final walkthrough", room: "General" },
+  // Bookings — March 2026
+  const b1 = await prisma.booking.create({ data: { propertyId: p1.id, guestName: "Thompson Family", checkIn: d(2026,3,8), checkOut: d(2026,3,11), platform: "AIRBNB", externalId: "airbnb-001" } })
+  const b2 = await prisma.booking.create({ data: { propertyId: p2.id, guestName: "Rodriguez Group", checkIn: d(2026,3,9), checkOut: d(2026,3,12), platform: "VRBO", externalId: "vrbo-001" } })
+  const b3 = await prisma.booking.create({ data: { propertyId: p1.id, guestName: "Smith Family", checkIn: d(2026,3,12), checkOut: d(2026,3,15), platform: "AIRBNB", externalId: "airbnb-002" } })
+  const b4 = await prisma.booking.create({ data: { propertyId: p2.id, guestName: "Johnson Party", checkIn: d(2026,3,13), checkOut: d(2026,3,17), platform: "VRBO", externalId: "vrbo-002" } })
+  const b5 = await prisma.booking.create({ data: { propertyId: p1.id, guestName: "Williams Family", checkIn: d(2026,3,18), checkOut: d(2026,3,22), platform: "AIRBNB", externalId: "airbnb-003" } })
+  const b6 = await prisma.booking.create({ data: { propertyId: p2.id, guestName: "Martinez Group", checkIn: d(2026,3,19), checkOut: d(2026,3,24), platform: "VRBO", externalId: "vrbo-003" } })
+  const b7 = await prisma.booking.create({ data: { propertyId: p1.id, guestName: "Davis Family", checkIn: d(2026,3,25), checkOut: d(2026,3,29), platform: "AIRBNB", externalId: "airbnb-004" } })
+
+  // Helper to create checklist items for a job
+  const checklistItems = [
+    { label: "Vacuum all floors", room: "General", order: 0, completed: false },
+    { label: "Mop hard floors", room: "General", order: 1, completed: false },
+    { label: "Empty all trash cans", room: "General", order: 2, completed: false },
+    { label: "Clean kitchen counters", room: "Kitchen", order: 3, completed: false },
+    { label: "Make beds with fresh linens", room: "Bedroom", order: 4, completed: false },
+    { label: "Clean and disinfect bathrooms", room: "Bathroom", order: 5, completed: false },
+    { label: "Final walkthrough", room: "General", order: 6, completed: false },
   ]
 
-  const now = new Date()
-  const h = (hours: number) => new Date(now.getTime() + hours * 3600000)
+  // COMPLETED jobs (past — with all checklist items done)
+  const completedItems = checklistItems.map((i) => ({ ...i, completed: true }))
 
-  // Create jobs
   const j1 = await prisma.job.create({
     data: {
-      propertyId: p1.id, hostId: sarah.id, cleanerId: maria.id,
-      status: "ASSIGNED", scheduledDate: h(3),
-      checkoutDate: h(2), checkinDate: h(9),
-      duration: 180, price: 185, platform: "AIRBNB",
-      notes: "Please pay special attention to the master bath. Fresh flowers in entryway if available.",
-      checklistItems: { create: checklist },
+      propertyId: p1.id, hostId: steve.id, cleanerId: cleaner1.id, bookingId: b1.id,
+      scheduledDate: d(2026,3,11), duration: 180, status: "COMPLETED",
+      checklistItems: { create: completedItems },
     },
+  })
+  await prisma.payment.create({
+    data: { jobId: j1.id, cleanerId: cleaner1.id, propertyId: p1.id, amount: 120, status: "PAID", paidAt: d(2026,3,11,14) },
   })
 
   const j2 = await prisma.job.create({
     data: {
-      propertyId: p2.id, hostId: sarah.id, cleanerId: david.id,
-      status: "ASSIGNED", scheduledDate: h(26),
-      checkoutDate: h(25), checkinDate: h(33),
-      duration: 120, price: 120, platform: "VRBO",
-      checklistItems: { create: checklist },
+      propertyId: p2.id, hostId: steve.id, cleanerId: cleaner2.id, bookingId: b2.id,
+      scheduledDate: d(2026,3,12), duration: 240, status: "COMPLETED",
+      checklistItems: { create: completedItems },
     },
   })
+  await prisma.payment.create({
+    data: { jobId: j2.id, cleanerId: cleaner2.id, propertyId: p2.id, amount: 225, status: "UNPAID" },
+  })
 
-  const j3 = await prisma.job.create({
+  // ASSIGNED jobs (coming up)
+  await prisma.job.create({
     data: {
-      propertyId: p3.id, hostId: sarah.id,
-      status: "OPEN", scheduledDate: h(50),
-      checkoutDate: h(49), checkinDate: h(57),
-      duration: 240, price: 220, platform: "AIRBNB",
-      checklistItems: { create: checklist },
+      propertyId: p1.id, hostId: steve.id, cleanerId: cleaner1.id, bookingId: b3.id,
+      scheduledDate: d(2026,3,15), duration: 180, status: "ASSIGNED",
+      checklistItems: { create: checklistItems },
     },
   })
 
-  const j4 = await prisma.job.create({
+  await prisma.job.create({
     data: {
-      propertyId: p4.id, hostId: mike.id, cleanerId: emma.id,
-      status: "IN_PROGRESS", scheduledDate: h(-0.5),
-      checkoutDate: h(-1.5), checkinDate: h(3.5),
-      duration: 150, price: 160, platform: "VRBO",
-      checklistItems: { create: checklist.map((c, i) => ({ ...c, completed: i < 3 })) },
+      propertyId: p2.id, hostId: steve.id, cleanerId: cleaner2.id, bookingId: b4.id,
+      scheduledDate: d(2026,3,17), duration: 240, status: "ASSIGNED",
+      checklistItems: { create: checklistItems },
     },
   })
 
-  const j5 = await prisma.job.create({
+  // UNASSIGNED jobs (needs cleaner)
+  await prisma.job.create({
     data: {
-      propertyId: p5.id, hostId: mike.id, cleanerId: james.id,
-      status: "COMPLETED", scheduledDate: h(-48),
-      checkoutDate: h(-50), checkinDate: h(-40),
-      duration: 300, price: 285, platform: "AIRBNB", completedAt: h(-45),
-      checklistItems: { create: checklist.map((c) => ({ ...c, completed: true })) },
+      propertyId: p1.id, hostId: steve.id, bookingId: b5.id,
+      scheduledDate: d(2026,3,22), duration: 180, status: "UNASSIGNED",
+      checklistItems: { create: checklistItems },
     },
   })
 
-  // Create review for completed job
-  await prisma.review.create({
+  await prisma.job.create({
     data: {
-      jobId: j5.id,
-      reviewerId: mike.id,
-      revieweeId: james.id,
-      rating: 5,
-      comment: "James did an outstanding job. The villa was spotless and perfectly staged for our next guests. Highly recommended!",
+      propertyId: p2.id, hostId: steve.id, bookingId: b6.id,
+      scheduledDate: d(2026,3,24), duration: 240, status: "UNASSIGNED",
+      checklistItems: { create: checklistItems },
     },
   })
 
-  console.log("✓ Created 2 hosts, 5 cleaners")
-  console.log("✓ Created 5 properties")
-  console.log("✓ Created 5 jobs (ASSIGNED, ASSIGNED, OPEN, IN_PROGRESS, COMPLETED)")
-  console.log("✓ Created 1 review")
-  console.log("")
-  console.log("Demo accounts (password: password123):")
-  console.log("  Host:    sarah@example.com")
-  console.log("  Host:    mike@example.com")
-  console.log("  Cleaner: maria@example.com")
-  console.log("  Cleaner: david@example.com")
-  console.log("  Cleaner: emma@example.com")
+  await prisma.job.create({
+    data: {
+      propertyId: p1.id, hostId: steve.id, bookingId: b7.id,
+      scheduledDate: d(2026,3,29), duration: 180, status: "UNASSIGNED",
+      checklistItems: { create: checklistItems },
+    },
+  })
+
+  // IN_PROGRESS job (today-ish)
+  await prisma.job.create({
+    data: {
+      propertyId: p2.id, hostId: steve.id, cleanerId: cleaner1.id,
+      scheduledDate: d(2026,3,9), duration: 240, status: "IN_PROGRESS",
+      checklistItems: { create: [
+        { label: "Vacuum all floors", room: "General", order: 0, completed: true },
+        { label: "Mop hard floors", room: "General", order: 1, completed: true },
+        { label: "Empty all trash cans", room: "General", order: 2, completed: true },
+        { label: "Clean kitchen counters", room: "Kitchen", order: 3, completed: false },
+        { label: "Make beds with fresh linens", room: "Bedroom", order: 4, completed: false },
+        { label: "Clean and disinfect bathrooms", room: "Bathroom", order: 5, completed: false },
+        { label: "Final walkthrough", room: "General", order: 6, completed: false },
+      ]},
+    },
+  })
+
+  // Notification for unassigned jobs
+  await prisma.notification.create({
+    data: {
+      userId: steve.id,
+      type: "JOB_ASSIGNED",
+      title: "3 jobs need a cleaner assigned",
+      message: "You have 3 upcoming jobs with no cleaner assigned for late March.",
+    },
+  })
+
+  console.log("✓ Admin:    stevebailey130@gmail.com / Admin1234!")
+  console.log("✓ Cleaner1: maria@cleaners.com / Cleaner123!")
+  console.log("✓ Cleaner2: james@cleaners.com / Cleaner123!")
+  console.log("✓ Pending:  sofia@cleaners.com (not approved)")
+  console.log("✓ 2 properties, 7 bookings, 8 jobs across March 2026")
+  console.log("✓ Statuses: 2 completed, 2 assigned, 3 unassigned, 1 in-progress")
 }
 
 main()
