@@ -13,7 +13,7 @@ import type { Job, User, ChecklistItem } from "@/types"
 import {
   Building2, MapPin, Calendar, Clock, CheckCircle2, Circle,
   ArrowLeft, AlertCircle, UserCheck, FileText, ThumbsUp, ThumbsDown,
-  TriangleAlert, Camera, X, ImagePlus, DollarSign,
+  TriangleAlert, Camera, X, ImagePlus, DollarSign, ShoppingCart, Package, Truck,
 } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -129,6 +129,24 @@ type IssueReportSummary = {
   reportedBy: { name: string } | null
 }
 
+type SupplyRequestSummary = {
+  id: string
+  items: string
+  notes: string | null
+  status: string
+  createdAt: string
+  requestedBy: { name: string } | null
+}
+
+const SUPPLY_STATUS_CLASS: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-700",
+  ORDERED: "bg-blue-100 text-blue-700",
+  DELIVERED: "bg-emerald-100 text-emerald-700",
+}
+const SUPPLY_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pending", ORDERED: "Ordered", DELIVERED: "Delivered",
+}
+
 const ISSUE_TYPE_LABELS: Record<string, string> = {
   DAMAGE: "Damage", BROKEN_ITEM: "Broken Item", STAIN: "Stain", PEST: "Pest", OTHER: "Other",
 }
@@ -150,6 +168,7 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
   const [payment, setPayment] = useState<Payment | null>(null)
   const [markingPaid, setMarkingPaid] = useState(false)
   const [issues, setIssues] = useState<IssueReportSummary[]>([])
+  const [supplyRequests, setSupplyRequests] = useState<SupplyRequestSummary[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
 
   useEffect(() => {
@@ -160,6 +179,10 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
     fetch(`/api/issues?jobId=${initialJob.id}`)
       .then((r) => r.json())
       .then((d) => setIssues(d.issues ?? []))
+      .catch(() => {})
+    fetch(`/api/supply-requests?jobId=${initialJob.id}`)
+      .then((r) => r.json())
+      .then((d) => setSupplyRequests(d.requests ?? []))
       .catch(() => {})
   }, [initialJob.id])
 
@@ -350,6 +373,77 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Supply requests */}
+            {supplyRequests.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.17 }}>
+                <Card padding="none">
+                  <CardHeader className="p-5 pb-3">
+                    <CardTitle className="flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4 text-blue-500" />
+                      Supply Requests ({supplyRequests.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <div className="divide-y divide-slate-50">
+                    {supplyRequests.map((req) => {
+                      const items: string[] = (() => { try { return JSON.parse(req.items) } catch { return [] } })()
+                      return (
+                        <div key={req.id} className="p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${SUPPLY_STATUS_CLASS[req.status]}`}>
+                              {SUPPLY_STATUS_LABELS[req.status]}
+                            </span>
+                            <div className="flex gap-1.5">
+                              {req.status === "PENDING" && (
+                                <button
+                                  onClick={async () => {
+                                    const res = await fetch(`/api/supply-requests/${req.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ status: "ORDERED" }),
+                                    })
+                                    if (res.ok) setSupplyRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: "ORDERED" } : r))
+                                  }}
+                                  className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                                >
+                                  Mark Ordered →
+                                </button>
+                              )}
+                              {req.status === "ORDERED" && (
+                                <button
+                                  onClick={async () => {
+                                    const res = await fetch(`/api/supply-requests/${req.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ status: "DELIVERED" }),
+                                    })
+                                    if (res.ok) setSupplyRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status: "DELIVERED" } : r))
+                                  }}
+                                  className="text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors"
+                                >
+                                  Mark Delivered →
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {items.map((item, i) => (
+                              <span key={i} className="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-full">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                          {req.notes && <p className="text-sm text-slate-600 italic">{req.notes}</p>}
+                          <p className="text-xs text-slate-400">
+                            by {req.requestedBy?.name} · {new Date(req.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </p>
+                        </div>
+                      )
+                    })}
                   </div>
                 </Card>
               </motion.div>
@@ -779,6 +873,128 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
   )
 }
 
+// ─── Request Supplies modal (cleaner) ─────────────────────────────────────────
+
+const PRESET_SUPPLIES = [
+  "Bed Linens", "Towels", "Hand Towels", "Washcloths",
+  "Toilet Paper", "Paper Towels", "Bleach", "Multi-Surface Cleaner",
+  "Dish Soap", "Laundry Detergent", "Trash Bags", "Sponges",
+  "Hand Soap", "Shampoo / Conditioner", "Coffee / Tea", "Other",
+]
+
+function RequestSuppliesModal({ jobId, onClose, onSubmitted }: { jobId: string; onClose: () => void; onSubmitted: () => void }) {
+  const [selected, setSelected] = useState<string[]>([])
+  const [notes, setNotes] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+
+  function toggle(item: string) {
+    setSelected((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item])
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (selected.length === 0) { setError("Please select at least one supply."); return }
+    setSubmitting(true)
+    setError("")
+    try {
+      const res = await fetch("/api/supply-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, items: selected, notes: notes.trim() || null }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setError(d.error ?? "Failed to submit request")
+        return
+      }
+      onSubmitted()
+    } catch {
+      setError("Something went wrong. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5 text-blue-500" />
+            <h2 className="font-bold text-slate-900">Request Supplies</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
+          <div className="p-5 space-y-5">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
+            )}
+
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-1">Select supplies needed</p>
+              <p className="text-xs text-slate-400 mb-3">Tap items to select. The host will be notified to restock.</p>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_SUPPLIES.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => toggle(item)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                      selected.includes(item)
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">Additional notes (optional)</p>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any specific details — brand, quantity, urgency..."
+                rows={3}
+                className="w-full px-3 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
+              />
+            </div>
+
+            {selected.length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1.5">Selected ({selected.length})</p>
+                <p className="text-sm text-blue-800">{selected.join(", ")}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 pb-5 pt-2 border-t border-slate-100 flex gap-3">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" disabled={submitting || selected.length === 0}>
+              {submitting ? <Spinner size="sm" /> : <><ShoppingCart className="w-4 h-4" /> Send Request</>}
+            </Button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  )
+}
+
 // ─── Cleaner job detail ───────────────────────────────────────────────────────
 
 function CleanerJobDetail({ job: initialJob }: { job: Job }) {
@@ -788,6 +1004,8 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [showReportIssue, setShowReportIssue] = useState(false)
   const [issueSubmitted, setIssueSubmitted] = useState(false)
+  const [showRequestSupplies, setShowRequestSupplies] = useState(false)
+  const [supplySubmitted, setSupplySubmitted] = useState(false)
 
   const done = checklist.filter((c) => c.completed).length
   const pct = checklist.length ? Math.round((done / checklist.length) * 100) : 0
@@ -1105,9 +1323,24 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
           </Button>
         )}
 
-        {/* Report Issue — available any time except cancelled */}
+        {/* Report Issue + Request Supplies — available any time except cancelled */}
         {job.status !== "CANCELLED" && (
-          <div className="pt-1">
+          <div className="pt-1 space-y-2">
+            {supplySubmitted ? (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                Supply request sent — host has been notified.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowRequestSupplies(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-2xl hover:bg-blue-50 transition-all"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                Request Supplies
+              </button>
+            )}
             {issueSubmitted ? (
               <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-sm text-emerald-700">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -1132,6 +1365,14 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
           jobId={job.id}
           onClose={() => setShowReportIssue(false)}
           onSubmitted={() => { setShowReportIssue(false); setIssueSubmitted(true) }}
+        />
+      )}
+
+      {showRequestSupplies && (
+        <RequestSuppliesModal
+          jobId={job.id}
+          onClose={() => setShowRequestSupplies(false)}
+          onSubmitted={() => { setShowRequestSupplies(false); setSupplySubmitted(true) }}
         />
       )}
     </div>

@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/Button"
 import { Spinner } from "@/components/ui/Spinner"
 import { Avatar } from "@/components/ui/Avatar"
 import { formatDateTime } from "@/lib/utils"
-import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock } from "lucide-react"
+import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, X } from "lucide-react"
 import Link from "next/link"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import type { IssueReport } from "@/types"
 
 const TYPE_LABELS: Record<string, string> = {
@@ -211,14 +211,31 @@ export default function IssueDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Lightbox */}
-      {lightbox && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setLightbox(null)}
-        >
-          <img src={lightbox} alt="" className="max-w-full max-h-full rounded-xl object-contain" />
-        </div>
-      )}
+      <AnimatePresence>
+        {lightbox && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setLightbox(null)}
+          >
+            <button className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-white/10 rounded-full transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={lightbox}
+              alt=""
+              className="max-w-full max-h-full rounded-xl object-contain shadow-2xl"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

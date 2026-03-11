@@ -15,7 +15,8 @@ export async function proxy(request: NextRequest) {
   const isPublic =
     PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r)) ||
     pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/invite/")
+    pathname.startsWith("/api/invite/") ||
+    pathname.startsWith("/api/reminders")
 
   let user = null
   if (token) {

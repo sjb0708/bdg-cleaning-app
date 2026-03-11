@@ -12,7 +12,7 @@ export async function GET() {
     const weekStart = startOfWeek(now)
     const weekEnd = endOfWeek(now)
 
-    const [totalProperties, unassignedJobs, assignedJobs, upcomingThisWeek, openIssues] = await Promise.all([
+    const [totalProperties, unassignedJobs, assignedJobs, upcomingThisWeek, openIssues, pendingSupplies] = await Promise.all([
       prisma.property.count({ where: { hostId: user.userId } }),
       prisma.job.count({ where: { hostId: user.userId, status: "UNASSIGNED" } }),
       prisma.job.count({ where: { hostId: user.userId, status: { in: ["ASSIGNED", "PENDING_ACCEPTANCE", "IN_PROGRESS"] } } }),
@@ -26,9 +26,12 @@ export async function GET() {
       prisma.issueReport.count({
         where: { property: { hostId: user.userId }, status: "OPEN" },
       }),
+      prisma.supplyRequest.count({
+        where: { property: { hostId: user.userId }, status: "PENDING" },
+      }),
     ])
 
-    return NextResponse.json({ totalProperties, unassignedJobs, assignedJobs, upcomingThisWeek, openIssues })
+    return NextResponse.json({ totalProperties, unassignedJobs, assignedJobs, upcomingThisWeek, openIssues, pendingSupplies })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

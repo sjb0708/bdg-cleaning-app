@@ -11,7 +11,7 @@ import { formatDateShort, formatTime, formatDate, STATUS_COLORS, STATUS_LABELS }
 import type { Job } from "@/types"
 import {
   Building2, Briefcase, Calendar, ArrowRight,
-  Clock, CheckCircle2, AlertCircle, Users, ChevronRight, TriangleAlert,
+  Clock, CheckCircle2, AlertCircle, Users, ChevronRight, TriangleAlert, ShoppingCart,
 } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -25,6 +25,7 @@ interface DashStats {
   assignedJobs: number
   upcomingThisWeek: number
   openIssues: number
+  pendingSupplies: number
 }
 
 function greeting(name: string) {
@@ -221,6 +222,23 @@ function AdminDashboard() {
                   <p className="text-xs text-red-700 mt-1">Your cleaners have reported damage or issues that need attention.</p>
                   <Link href="/issues">
                     <Button size="sm" className="mt-3 bg-red-600 hover:bg-red-700">Review Issues</Button>
+                  </Link>
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
+          {stats?.pendingSupplies ? (
+            <Card className="bg-blue-50 border-blue-200">
+              <div className="flex items-start gap-3">
+                <ShoppingCart className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">
+                    {stats.pendingSupplies} supply request{stats.pendingSupplies !== 1 ? "s" : ""} pending
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">Your cleaners need supplies restocked at one or more properties.</p>
+                  <Link href="/supply-requests">
+                    <Button size="sm" className="mt-3 bg-blue-600 hover:bg-blue-700">Review Requests</Button>
                   </Link>
                 </div>
               </div>

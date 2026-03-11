@@ -110,15 +110,18 @@ export default function NotificationsPage() {
     }
 
     // Navigate based on type
+    const title = notification.title.toLowerCase()
     if (notification.jobId) {
       router.push(`/jobs/${notification.jobId}`)
-    } else if (notification.title.toLowerCase().includes("issue")) {
+    } else if (title.includes("supply") || title.includes("supplies")) {
+      router.push("/supply-requests")
+    } else if (title.includes("issue")) {
       router.push("/issues")
     } else if (
       ["JOB_ASSIGNED", "JOB_UPDATED", "JOB_CANCELLED", "JOB_REMINDER"].includes(notification.type) ||
-      notification.title.toLowerCase().includes("job") ||
-      notification.title.toLowerCase().includes("cleaner") ||
-      notification.title.toLowerCase().includes("assign")
+      title.includes("job") ||
+      title.includes("cleaner") ||
+      title.includes("assign")
     ) {
       router.push("/jobs")
     }

@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface HeaderProps {
   title?: string
@@ -54,11 +55,14 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
       setUnreadCount((c) => Math.max(0, c - 1))
     }
     // Navigate
+    const title = n.title.toLowerCase()
     if (n.jobId) {
       router.push(`/jobs/${n.jobId}`)
-    } else if (n.title.toLowerCase().includes("issue")) {
+    } else if (title.includes("supply") || title.includes("supplies")) {
+      router.push("/supply-requests")
+    } else if (title.includes("issue")) {
       router.push("/issues")
-    } else if (n.title.toLowerCase().includes("job") || n.title.toLowerCase().includes("cleaner") || n.title.toLowerCase().includes("assign")) {
+    } else if (title.includes("job") || title.includes("cleaner") || title.includes("assign")) {
       router.push("/jobs")
     } else {
       router.push("/notifications")
@@ -81,51 +85,79 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
             onClick={() => setNotifOpen(!notifOpen)}
             className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
           >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full" />
-            )}
+            <Bell className={`w-4 h-4 transition-transform ${notifOpen ? "scale-110" : ""}`} />
+            <AnimatePresence>
+              {unreadCount > 0 && (
+                <motion.span
+                  key="dot"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"
+                />
+              )}
+            </AnimatePresence>
           </button>
 
-          {notifOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-20">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="font-semibold text-slate-900">Notifications</h3>
-                  {unreadCount > 0 && <p className="text-xs text-blue-600">{unreadCount} unread</p>}
-                </div>
-                <div className="divide-y divide-slate-50">
-                  {notifications.length === 0 ? (
-                    <p className="p-4 text-sm text-slate-400 text-center">No notifications</p>
-                  ) : (
-                    notifications.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => handleClick(n)}
-                        className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${!n.read ? "bg-blue-50/50" : ""}`}
-                      >
-                        <p className="text-sm font-medium text-slate-900 truncate">{n.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                        </p>
-                      </button>
-                    ))
-                  )}
-                </div>
-                <div className="p-3 border-t border-slate-100">
-                  <Link
-                    href="/notifications"
-                    onClick={() => setNotifOpen(false)}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium w-full text-center block"
-                  >
-                    View all notifications
-                  </Link>
-                </div>
-              </div>
-            </>
-          )}
+          <AnimatePresence>
+            {notifOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-20 overflow-hidden"
+                >
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+                  <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="p-6 text-sm text-slate-400 text-center">No notifications yet</p>
+                    ) : (
+                      notifications.map((n, i) => (
+                        <motion.button
+                          key={n.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          onClick={() => handleClick(n)}
+                          className={`w-full text-left p-4 hover:bg-slate-50 transition-colors group ${!n.read ? "bg-blue-50/40" : ""}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate group-hover:text-blue-700 transition-colors">{n.title}</p>
+                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                              </p>
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+                    <Link
+                      href="/notifications"
+                      onClick={() => setNotifOpen(false)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold w-full text-center block transition-colors"
+                    >
+                      View all notifications →
+                    </Link>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* User avatar */}

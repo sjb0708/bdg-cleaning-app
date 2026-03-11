@@ -32,6 +32,7 @@ model User {
   notifications     Notification[]
   paymentsReceived  Payment[]      @relation("CleanerPayments")
   issueReports      IssueReport[]
+  supplyRequests    SupplyRequest[]
 }
 
 model Property {
@@ -60,6 +61,7 @@ model Property {
   checklistTemplate ChecklistTemplate?
   payments          Payment[]
   issueReports      IssueReport[]
+  supplyRequests    SupplyRequest[]
 }
 
 model Booking {
@@ -98,10 +100,11 @@ model Job {
   host           User            @relation("AdminJobs", fields: [hostId], references: [id])
   cleaner        User?           @relation("CleanerJobs", fields: [cleanerId], references: [id])
   booking        Booking?        @relation(fields: [bookingId], references: [id])
-  checklistItems ChecklistItem[]
-  notifications  Notification[]
-  payment        Payment?
-  issueReports   IssueReport[]
+  checklistItems  ChecklistItem[]
+  notifications   Notification[]
+  payment         Payment?
+  issueReports    IssueReport[]
+  supplyRequests  SupplyRequest[]
 }
 
 model ChecklistTemplate {
@@ -174,6 +177,22 @@ model IssuePhoto {
   createdAt     DateTime    @default(now())
 
   issueReport IssueReport @relation(fields: [issueReportId], references: [id], onDelete: Cascade)
+}
+
+model SupplyRequest {
+  id            String   @id @default(cuid())
+  jobId         String
+  propertyId    String
+  requestedById String
+  items         String   // JSON array of supply names
+  notes         String?
+  status        String   @default("PENDING") // PENDING, ORDERED, DELIVERED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  property    Property @relation(fields: [propertyId], references: [id])
+  requestedBy User     @relation(fields: [requestedById], references: [id])
 }
 
 model Payment {

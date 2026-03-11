@@ -20,6 +20,7 @@ import {
   DollarSign,
   TriangleAlert,
   TrendingUp,
+  ShoppingCart,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 
@@ -30,6 +31,7 @@ const adminNav = [
   { href: "/jobs", label: "Jobs", icon: Briefcase },
   { href: "/payments", label: "Payments", icon: DollarSign },
   { href: "/issues", label: "Issues", icon: TriangleAlert },
+  { href: "/supply-requests", label: "Supplies", icon: ShoppingCart },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/users", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -40,6 +42,7 @@ const cleanerNav = [
   { href: "/jobs", label: "All Jobs", icon: Briefcase },
   { href: "/payments", label: "Earnings", icon: TrendingUp },
   { href: "/issues", label: "My Reports", icon: TriangleAlert },
+  { href: "/supply-requests", label: "My Requests", icon: ShoppingCart },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

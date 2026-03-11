@@ -150,8 +150,8 @@ function UserCard({ user, pending, onApprove, onReject, onDeactivate, actionLoad
   const loading = actionLoading === user.id
 
   return (
-    <motion.div variants={fadeUp}>
-      <Card hover={false} padding="none">
+    <motion.div variants={fadeUp} whileHover={{ y: -1 }} transition={{ duration: 0.15 }}>
+      <Card padding="none" className="hover:border-blue-200 hover:shadow-md transition-all duration-200">
         <div className="p-4 flex items-start gap-4">
           <Avatar name={user.name} size="lg" className="flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -192,6 +192,9 @@ function UserCard({ user, pending, onApprove, onReject, onDeactivate, actionLoad
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
                   {user.location}
                 </div>
+              )}
+              {user.bio && (
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-2">{user.bio}</p>
               )}
             </div>
 

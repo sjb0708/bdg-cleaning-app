@@ -139,6 +139,21 @@ export interface IssueReport {
   photos: IssuePhoto[]
 }
 
+export interface SupplyRequest {
+  id: string
+  jobId: string
+  propertyId: string
+  requestedById: string
+  items: string // JSON array
+  notes?: string | null
+  status: "PENDING" | "ORDERED" | "DELIVERED"
+  createdAt: string
+  updatedAt: string
+  job?: { id: string; scheduledDate: string }
+  property?: { id: string; name: string }
+  requestedBy?: { id: string; name: string; avatarUrl?: string | null }
+}
+
 export interface JwtPayload {
   userId: string
   email: string
