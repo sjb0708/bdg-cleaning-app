@@ -4,8 +4,7 @@ generator client {
 }
 
 datasource db {
-  // Local dev: sqlite  |  Production (Neon): change to "postgresql"
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
