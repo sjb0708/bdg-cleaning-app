@@ -79,20 +79,34 @@ export default function PropertiesPage() {
         {/* Summary row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
           {[
-            { label: "Total Properties", value: properties.length, icon: Building2, color: "text-blue-600 bg-blue-50" },
-            { label: "Active Jobs", value: properties.reduce((a, p) => a + (p.jobs?.length || 0), 0), icon: Calendar, color: "text-purple-600 bg-purple-50" },
-            { label: "iCal Connected", value: properties.filter((p) => p.airbnbIcalUrl || p.vrboIcalUrl).length, icon: Wifi, color: "text-emerald-600 bg-emerald-50" },
+            { label: "Total Properties", value: properties.length, icon: Building2, color: "text-blue-600 bg-blue-50", href: null },
+            { label: "Active Jobs", value: properties.reduce((a, p) => a + (p.jobs?.length || 0), 0), icon: Calendar, color: "text-purple-600 bg-purple-50", href: "/jobs" },
+            { label: "iCal Connected", value: properties.filter((p) => p.airbnbIcalUrl || p.vrboIcalUrl).length, icon: Wifi, color: "text-emerald-600 bg-emerald-50", href: null },
           ].map((s) => (
             <Card key={s.label}>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color}`}>
-                  <s.icon className="w-5 h-5" />
+              {s.href ? (
+                <Link href={s.href}>
+                  <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color}`}>
+                      <s.icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+                      <p className="text-xs text-slate-500">{s.label}</p>
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color}`}>
+                    <s.icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+                    <p className="text-xs text-slate-500">{s.label}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-                  <p className="text-xs text-slate-500">{s.label}</p>
-                </div>
-              </div>
+              )}
             </Card>
           ))}
         </div>
