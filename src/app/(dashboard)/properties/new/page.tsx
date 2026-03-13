@@ -153,7 +153,7 @@ export default function NewPropertyPage() {
                   />
 
                   <div>
-                    <Select label="Cleaning duration" icon={Clock} value={form.cleaningDuration}
+                    <Select label="Cleaning duration" value={form.cleaningDuration}
                       onChange={(e) => update("cleaningDuration", e.target.value)}
                       options={[
                         { value: "60", label: "1 hour" },

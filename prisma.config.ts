@@ -1,19 +1,7 @@
 import "dotenv/config"
-import path from "path"
 import { defineConfig } from "prisma/config"
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
-import { PrismaNeon } from "@prisma/adapter-neon"
 
 const url = process.env["DATABASE_URL"] || "file:./dev.db"
-
-function getAdapter() {
-  if (url.startsWith("file:")) {
-    const filePath = url.replace("file:", "")
-    const resolved = path.resolve(process.cwd(), filePath.startsWith("./") ? filePath.slice(2) : filePath)
-    return new PrismaBetterSqlite3({ url: resolved })
-  }
-  return new PrismaNeon({ connectionString: url })
-}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -23,5 +11,4 @@ export default defineConfig({
   datasource: {
     url,
   },
-  adapter: getAdapter(),
 })

@@ -87,7 +87,7 @@ function AdminDashboard() {
       iconColor: "text-amber-600",
       iconBg: "bg-amber-50",
       change: stats?.unassignedJobs ? "Need cleaner assigned" : "All covered",
-      changeType: (stats?.unassignedJobs ? "negative" : "positive") as const,
+      changeType: (stats?.unassignedJobs ? "negative" : "positive") as "negative" | "positive",
     },
     {
       title: "Assigned Jobs",
