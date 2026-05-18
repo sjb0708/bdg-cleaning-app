@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jwtVerify } from "jose"
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-secret-change-in-production"
-)
+function getJwtSecret(): Uint8Array {
+  const value = process.env.JWT_SECRET
+  if (!value) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET is required in production")
+    }
+    return new TextEncoder().encode("dev-only-fallback-do-not-use-in-production")
+  }
+  return new TextEncoder().encode(value)
+}
+
+const secret = getJwtSecret()
 
 const PUBLIC_ROUTES = ["/login", "/logout", "/register"]
 
@@ -16,7 +25,8 @@ export async function proxy(request: NextRequest) {
     PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r)) ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/invite/") ||
-    pathname.startsWith("/api/reminders")
+    pathname.startsWith("/api/reminders") ||
+    pathname.startsWith("/api/bookings/sync")
 
   let user = null
   if (token) {

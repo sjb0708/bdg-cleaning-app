@@ -1,6 +1,23 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+
+async function authorize(req: NextRequest): Promise<NextResponse | null> {
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization")
+    const querySecret = new URL(req.url).searchParams.get("secret")
+    if (authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret) {
+      return null
+    }
+  }
+
+  const user = await getCurrentUser()
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  return null
+}
 
 // Simple iCal parser — handles Airbnb and VRBO formats
 function parseIcal(text: string): {
@@ -104,10 +121,10 @@ async function fetchAndSync(propertyId: string, icalUrl: string, platform: strin
   return { created, skipped, total: events.length }
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser()
-    if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const denied = await authorize(req)
+    if (denied) return denied
 
     const properties = await prisma.property.findMany({
       where: {
@@ -153,6 +170,6 @@ export async function POST() {
 }
 
 // GET for cron/background use
-export async function GET() {
-  return POST()
+export async function GET(req: NextRequest) {
+  return POST(req)
 }
