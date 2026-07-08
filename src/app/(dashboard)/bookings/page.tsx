@@ -240,9 +240,12 @@ interface PropertyGroupCardProps {
   onCreateJob: (b: BookingWithProperty) => void
 }
 
+const UPCOMING_PREVIEW_COUNT = 8
+
 function PropertyGroupCard({ group, onCreateJob }: PropertyGroupCardProps) {
   const { property, bookings } = group
   const [showPast, setShowPast] = useState(false)
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false)
 
   const sortedBookings = [...bookings].sort(
     (a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime()
@@ -250,7 +253,9 @@ function PropertyGroupCard({ group, onCreateJob }: PropertyGroupCardProps) {
   const now = new Date()
   const pastBookings = sortedBookings.filter((b) => new Date(b.checkOut) < now)
   const upcomingBookings = sortedBookings.filter((b) => new Date(b.checkOut) >= now)
-  const visibleBookings = showPast ? sortedBookings : upcomingBookings
+  const hiddenUpcomingCount = upcomingBookings.length - UPCOMING_PREVIEW_COUNT
+  const visibleUpcoming = showAllUpcoming ? upcomingBookings : upcomingBookings.slice(0, UPCOMING_PREVIEW_COUNT)
+  const visibleBookings = showPast ? sortedBookings : visibleUpcoming
 
   return (
     <Card padding="none">
@@ -300,6 +305,14 @@ function PropertyGroupCard({ group, onCreateJob }: PropertyGroupCardProps) {
               />
             )
           })
+        )}
+        {!showPast && hiddenUpcomingCount > 0 && (
+          <button
+            onClick={() => setShowAllUpcoming(true)}
+            className="w-full py-3 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-slate-50 transition-colors border-t border-slate-50"
+          >
+            Show {hiddenUpcomingCount} more upcoming booking{hiddenUpcomingCount === 1 ? "" : "s"}
+          </button>
         )}
       </div>
     </Card>
