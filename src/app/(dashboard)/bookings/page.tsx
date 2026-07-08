@@ -146,6 +146,7 @@ function BookingRow({ booking, nextBooking, onCreateJob }: BookingRowProps) {
   const assignedJob = booking.jobs?.[0]
   const isPast = new Date(booking.checkOut) < new Date()
   const sameDayTurnover =
+    !isPast &&
     nextBooking !== null &&
     isSameDay(new Date(booking.checkOut), new Date(nextBooking.checkIn))
   const platform = booking.platform?.toLowerCase()
@@ -241,43 +242,64 @@ interface PropertyGroupCardProps {
 
 function PropertyGroupCard({ group, onCreateJob }: PropertyGroupCardProps) {
   const { property, bookings } = group
+  const [showPast, setShowPast] = useState(false)
+
   const sortedBookings = [...bookings].sort(
     (a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime()
   )
+  const now = new Date()
+  const pastBookings = sortedBookings.filter((b) => new Date(b.checkOut) < now)
+  const upcomingBookings = sortedBookings.filter((b) => new Date(b.checkOut) >= now)
+  const visibleBookings = showPast ? sortedBookings : upcomingBookings
 
   return (
     <Card padding="none">
       <CardHeader className="p-5 pb-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-5 h-5 text-blue-600" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle>{property.name}</CardTitle>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {property.city}, {property.state}
+                {property.lastSyncedAt
+                  ? ` · Synced ${formatDateTime(property.lastSyncedAt)}`
+                  : ""}
+              </p>
+            </div>
           </div>
-          <div>
-            <CardTitle>{property.name}</CardTitle>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {property.city}, {property.state}
-              {property.lastSyncedAt
-                ? ` · Synced ${formatDateTime(property.lastSyncedAt)}`
-                : ""}
-            </p>
-          </div>
+          {pastBookings.length > 0 && (
+            <button
+              onClick={() => setShowPast((v) => !v)}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 flex-shrink-0"
+            >
+              {showPast ? "Hide past bookings" : `Show ${pastBookings.length} past booking${pastBookings.length === 1 ? "" : "s"}`}
+            </button>
+          )}
         </div>
       </CardHeader>
 
       <div className="mt-4">
-        {sortedBookings.length === 0 ? (
+        {visibleBookings.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-400">
-            No bookings found for this property.
+            {upcomingBookings.length === 0 && !showPast
+              ? "No upcoming bookings for this property."
+              : "No bookings found for this property."}
           </div>
         ) : (
-          sortedBookings.map((booking, i) => (
-            <BookingRow
-              key={booking.id}
-              booking={booking}
-              nextBooking={sortedBookings[i + 1] ?? null}
-              onCreateJob={onCreateJob}
-            />
-          ))
+          visibleBookings.map((booking) => {
+            const i = sortedBookings.findIndex((b) => b.id === booking.id)
+            return (
+              <BookingRow
+                key={booking.id}
+                booking={booking}
+                nextBooking={sortedBookings[i + 1] ?? null}
+                onCreateJob={onCreateJob}
+              />
+            )
+          })
         )}
       </div>
     </Card>
