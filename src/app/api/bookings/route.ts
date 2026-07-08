@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const bookings = await prisma.booking.findMany({
       where: propertyId ? { propertyId } : {},
       include: {
-        property: { select: { id: true, name: true, bedrooms: true, bathrooms: true } },
+        property: { select: { id: true, name: true, city: true, state: true, bedrooms: true, bathrooms: true, lastSyncedAt: true } },
         jobs: {
           include: {
             cleaner: { select: { id: true, name: true, avatarUrl: true } },
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const booking = await prisma.booking.create({
       data: {
         propertyId,
-        platform: platform || "MANUAL",
+        platform: (platform || "manual").toLowerCase(),
         guestName: guestName || null,
         checkIn: new Date(checkIn),
         checkOut: new Date(checkOut),

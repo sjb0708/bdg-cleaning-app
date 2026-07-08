@@ -26,7 +26,9 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/invite/") ||
     pathname.startsWith("/api/reminders") ||
-    pathname.startsWith("/api/bookings/sync")
+    pathname.startsWith("/api/bookings/sync") ||
+    pathname.startsWith("/respond/") ||
+    pathname.startsWith("/api/respond/")
 
   let user = null
   if (token) {

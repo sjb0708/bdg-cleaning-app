@@ -27,15 +27,17 @@ type Property = {
 }
 
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user, refetch } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState("profile")
 
   // Profile state
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState("")
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
   const [form, setForm] = useState({ name: "", email: "", phone: "", location: "", bio: "" })
 
   // Notification prefs state
@@ -43,6 +45,7 @@ export default function SettingsPage() {
   const [appNotif, setAppNotif] = useState(true)
   const [savingNotif, setSavingNotif] = useState(false)
   const [savedNotif, setSavedNotif] = useState(false)
+  const [notifError, setNotifError] = useState("")
 
   // Password state
   const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" })
@@ -84,27 +87,44 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
+    setAvatarError("")
     try {
       const fd = new FormData()
       fd.append("file", file)
       const res = await fetch("/api/upload/avatar", { method: "POST", body: fd })
-      const data = await res.json()
-      if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
-    } catch {}
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAvatarError(data.error ?? "Failed to upload photo.")
+      } else if (data.avatarUrl) {
+        setAvatarUrl(data.avatarUrl)
+        await refetch()
+      }
+    } catch {
+      setAvatarError("Failed to upload photo. Please try again.")
+    }
     setUploading(false)
   }
 
   const handleSaveProfile = async () => {
     if (!user) return
     setSaving(true)
+    setSaveError("")
     try {
-      await fetch(`/api/users/${user.id}`, {
+      const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, phone: form.phone, location: form.location, bio: form.bio }),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSaveError(data.error ?? "Failed to save changes.")
+      } else {
+        await refetch()
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2500)
+      }
+    } catch {
+      setSaveError("Failed to save changes. Please try again.")
     } finally {
       setSaving(false)
     }
@@ -113,14 +133,23 @@ export default function SettingsPage() {
   const handleSaveNotifications = async () => {
     if (!user) return
     setSavingNotif(true)
+    setNotifError("")
     try {
-      await fetch(`/api/users/${user.id}`, {
+      const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailNotifications: emailNotif, appNotifications: appNotif }),
       })
-      setSavedNotif(true)
-      setTimeout(() => setSavedNotif(false), 2500)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setNotifError(data.error ?? "Failed to save preferences.")
+      } else {
+        await refetch()
+        setSavedNotif(true)
+        setTimeout(() => setSavedNotif(false), 2500)
+      }
+    } catch {
+      setNotifError("Failed to save preferences. Please try again.")
     } finally {
       setSavingNotif(false)
     }
@@ -160,19 +189,6 @@ export default function SettingsPage() {
     } finally {
       setSavingPw(false)
     }
-  }
-
-  const handleDeleteAccount = async () => {
-    if (!user) return
-    const confirmed = window.confirm(
-      "Are you sure you want to permanently delete your account? This cannot be undone."
-    )
-    if (!confirmed) return
-    try {
-      await fetch(`/api/users/${user.id}`, { method: "DELETE" })
-      await fetch("/api/auth/logout", { method: "POST" })
-      window.location.href = "/login"
-    } catch {}
   }
 
   return (
@@ -410,14 +426,13 @@ export default function SettingsPage() {
 
                   <Card className="border-red-100">
                     <CardHeader><CardTitle className="text-red-600">Danger Zone</CardTitle></CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-700">Permanently delete your account and all data.</p>
-                        <p className="text-xs text-red-400 mt-1">This action cannot be undone</p>
-                      </div>
-                      <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
-                        Delete Account
-                      </Button>
+                    <div>
+                      <p className="text-sm text-slate-700">
+                        {user?.role === "ADMIN"
+                          ? "Account removal isn't self-service for admins — ask another admin to remove you from Team."
+                          : "To close your account, ask an admin to remove you from Team."}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">This keeps a second admin in the loop before any account is deleted.</p>
                     </div>
                   </Card>
                 </div>

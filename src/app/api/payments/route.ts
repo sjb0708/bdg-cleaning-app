@@ -35,8 +35,10 @@ export async function GET(req: NextRequest) {
         job: {
           include: {
             property: true,
+            cleaner: { select: { id: true, name: true, email: true, avatarUrl: true } },
           },
         },
+        cleaner: { select: { id: true, name: true, email: true, avatarUrl: true } },
         property: true,
       },
       orderBy: { createdAt: "desc" },

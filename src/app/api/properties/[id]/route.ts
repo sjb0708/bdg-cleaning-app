@@ -39,11 +39,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.city !== undefined) updateData.city = body.city
     if (body.state !== undefined) updateData.state = body.state
     if (body.description !== undefined) updateData.description = body.description
+    if (body.bedrooms !== undefined) updateData.bedrooms = parseInt(body.bedrooms)
+    if (body.bathrooms !== undefined) updateData.bathrooms = parseFloat(body.bathrooms)
     if (body.airbnbIcalUrl !== undefined) updateData.airbnbIcalUrl = body.airbnbIcalUrl || null
     if (body.vrboIcalUrl !== undefined) updateData.vrboIcalUrl = body.vrboIcalUrl || null
     if (body.cleaningDuration !== undefined) updateData.cleaningDuration = parseInt(body.cleaningDuration)
     if (body.cleaningFee !== undefined) updateData.cleaningFee = parseFloat(body.cleaningFee) || 0
+    if (body.checkoutTime !== undefined) updateData.checkoutTime = body.checkoutTime || "11:00 AM"
     if (body.imageUrl !== undefined) updateData.imageUrl = body.imageUrl || null
+    if (body.doorCode !== undefined) updateData.doorCode = body.doorCode || null
+    if (body.supplyClosetCode !== undefined) updateData.supplyClosetCode = body.supplyClosetCode || null
+    if (body.wifiNetwork !== undefined) updateData.wifiNetwork = body.wifiNetwork || null
+    if (body.wifiPassword !== undefined) updateData.wifiPassword = body.wifiPassword || null
     if (body.accessInstructions !== undefined) updateData.accessInstructions = body.accessInstructions || null
 
     const property = await prisma.property.update({

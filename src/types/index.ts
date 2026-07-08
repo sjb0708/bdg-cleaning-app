@@ -2,7 +2,7 @@ export type Role = "ADMIN" | "CLEANER"
 
 export type JobStatus = "UNASSIGNED" | "PENDING_ACCEPTANCE" | "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
 
-export type NotificationType = "JOB_ASSIGNED" | "JOB_UPDATED" | "JOB_REMINDER" | "JOB_CANCELLED" | "GENERAL"
+export type NotificationType = "JOB_ASSIGNED" | "JOB_ACCEPTED" | "JOB_DECLINED" | "JOB_COMPLETED" | "JOB_CANCELLED" | "GENERAL"
 
 export interface User {
   id: string
@@ -16,6 +16,9 @@ export interface User {
   approved: boolean
   emailNotifications: boolean
   appNotifications: boolean
+  notificationChannel?: string
+  paymentMethod?: string | null
+  paymentDetails?: string | null
   createdAt: string
 }
 
@@ -34,6 +37,11 @@ export interface Property {
   vrboIcalUrl?: string | null
   cleaningDuration: number
   cleaningFee?: number
+  checkoutTime?: string
+  doorCode?: string | null
+  supplyClosetCode?: string | null
+  wifiNetwork?: string | null
+  wifiPassword?: string | null
   accessInstructions?: string | null
   lastSyncedAt?: string | null
   createdAt: string
@@ -74,6 +82,7 @@ export interface Job {
   cleaner?: User | null
   booking?: Booking | null
   checklistItems?: ChecklistItem[]
+  isTurnover?: boolean
 }
 
 export interface ChecklistTemplate {

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
+import { storeFile } from "@/lib/storage"
 import { randomUUID } from "crypto"
 
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads", "issues")
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"]
 
@@ -12,8 +10,6 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    await mkdir(UPLOAD_DIR, { recursive: true })
 
     const formData = await req.formData()
     const files = formData.getAll("files") as File[]
@@ -40,8 +36,7 @@ export async function POST(req: NextRequest) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg"
       const filename = `${randomUUID()}.${ext}`
       const bytes = await file.arrayBuffer()
-      await writeFile(join(UPLOAD_DIR, filename), Buffer.from(bytes))
-      urls.push(`/uploads/issues/${filename}`)
+      urls.push(await storeFile("issues", filename, Buffer.from(bytes), file.type || undefined))
     }
 
     return NextResponse.json({ urls })

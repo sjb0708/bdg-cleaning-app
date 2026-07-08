@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { ensureJobForBooking } from "@/lib/jobs"
 
 async function authorize(req: NextRequest): Promise<NextResponse | null> {
   const cronSecret = process.env.CRON_SECRET
@@ -76,7 +77,15 @@ function parseIcalDate(str: string): Date | null {
   }
 }
 
-async function fetchAndSync(propertyId: string, icalUrl: string, platform: string) {
+type SyncProperty = {
+  id: string
+  hostId: string
+  name: string
+  cleaningDuration: number
+  checklistTemplate: { items: { label: string; room: string | null; order: number }[] } | null
+}
+
+async function fetchAndSync(property: SyncProperty, icalUrl: string, platform: string) {
   const res = await fetch(icalUrl, { next: { revalidate: 0 } })
   if (!res.ok) throw new Error(`Failed to fetch iCal from ${icalUrl}`)
   const text = await res.text()
@@ -84,6 +93,8 @@ async function fetchAndSync(propertyId: string, icalUrl: string, platform: strin
 
   let created = 0
   let skipped = 0
+  let jobsCreated = 0
+  let jobsRescheduled = 0
 
   for (const event of events) {
     if (!event.dtstart || !event.dtend) { skipped++; continue }
@@ -96,10 +107,10 @@ async function fetchAndSync(propertyId: string, icalUrl: string, platform: strin
     }
 
     try {
-      await prisma.booking.upsert({
-        where: { propertyId_externalId: { propertyId, externalId: event.uid } },
+      const booking = await prisma.booking.upsert({
+        where: { propertyId_externalId: { propertyId: property.id, externalId: event.uid } },
         create: {
-          propertyId,
+          propertyId: property.id,
           platform,
           externalId: event.uid,
           guestName: event.summary !== "Airbnb" && event.summary !== "VRBO" ? event.summary : null,
@@ -113,12 +124,32 @@ async function fetchAndSync(propertyId: string, icalUrl: string, platform: strin
         },
       })
       created++
+
+      // Auto-create/reschedule the turnover cleaning job for this booking
+      const jobResult = await ensureJobForBooking(property, booking)
+      if (jobResult === "created") jobsCreated++
+      if (jobResult === "rescheduled") jobsRescheduled++
     } catch {
       skipped++
     }
   }
 
-  return { created, skipped, total: events.length }
+  // One summary notification per property per sync — not one per booking
+  if (jobsCreated > 0 || jobsRescheduled > 0) {
+    const parts = []
+    if (jobsCreated > 0) parts.push(`${jobsCreated} new cleaning job${jobsCreated > 1 ? "s" : ""} created`)
+    if (jobsRescheduled > 0) parts.push(`${jobsRescheduled} rescheduled`)
+    await prisma.notification.create({
+      data: {
+        userId: property.hostId,
+        type: "GENERAL",
+        title: "Calendar Sync",
+        message: `${property.name}: ${parts.join(", ")} from ${platform} bookings. Unassigned jobs need a cleaner.`,
+      },
+    })
+  }
+
+  return { created, skipped, total: events.length, jobsCreated, jobsRescheduled }
 }
 
 export async function POST(req: NextRequest) {
@@ -133,26 +164,27 @@ export async function POST(req: NextRequest) {
           { vrboIcalUrl: { not: null } },
         ],
       },
+      include: { checklistTemplate: { include: { items: { orderBy: { order: "asc" } } } } },
     })
 
-    const results: { propertyId: string; name: string; platform: string; synced: number; errors: string[] }[] = []
+    const results: { propertyId: string; name: string; platform: string; synced: number; jobsCreated: number; errors: string[] }[] = []
 
     for (const property of properties) {
       if (property.airbnbIcalUrl) {
         try {
-          const r = await fetchAndSync(property.id, property.airbnbIcalUrl, "airbnb")
-          results.push({ propertyId: property.id, name: property.name, platform: "airbnb", synced: r.created, errors: [] })
+          const r = await fetchAndSync(property, property.airbnbIcalUrl, "airbnb")
+          results.push({ propertyId: property.id, name: property.name, platform: "airbnb", synced: r.created, jobsCreated: r.jobsCreated, errors: [] })
         } catch (e) {
-          results.push({ propertyId: property.id, name: property.name, platform: "airbnb", synced: 0, errors: [(e as Error).message] })
+          results.push({ propertyId: property.id, name: property.name, platform: "airbnb", synced: 0, jobsCreated: 0, errors: [(e as Error).message] })
         }
       }
 
       if (property.vrboIcalUrl) {
         try {
-          const r = await fetchAndSync(property.id, property.vrboIcalUrl, "vrbo")
-          results.push({ propertyId: property.id, name: property.name, platform: "vrbo", synced: r.created, errors: [] })
+          const r = await fetchAndSync(property, property.vrboIcalUrl, "vrbo")
+          results.push({ propertyId: property.id, name: property.name, platform: "vrbo", synced: r.created, jobsCreated: r.jobsCreated, errors: [] })
         } catch (e) {
-          results.push({ propertyId: property.id, name: property.name, platform: "vrbo", synced: 0, errors: [(e as Error).message] })
+          results.push({ propertyId: property.id, name: property.name, platform: "vrbo", synced: 0, jobsCreated: 0, errors: [(e as Error).message] })
         }
       }
 

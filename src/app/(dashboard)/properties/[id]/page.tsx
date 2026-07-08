@@ -9,7 +9,8 @@ import { Spinner } from "@/components/ui/Spinner"
 import { motion } from "framer-motion"
 import {
   Building2, MapPin, Bed, Bath, Clock, Link2, Plus, Trash2,
-  GripVertical, Save, ArrowLeft, Wifi, WifiOff, ChevronDown, ChevronUp, DollarSign
+  GripVertical, Save, ArrowLeft, Wifi, WifiOff, ChevronDown, ChevronUp, DollarSign, Camera, Loader2,
+  KeyRound, Package, StickyNote
 } from "lucide-react"
 import Link from "next/link"
 import type { Property, ChecklistTemplateItem } from "@/types"
@@ -40,9 +41,14 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [rooms, setRooms] = useState<Room[]>([])
   const [newRoomName, setNewRoomName] = useState("")
   const [collapsedRooms, setCollapsedRooms] = useState<Set<string>>(new Set())
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState("")
 
   // Edit property fields
-  const [editForm, setEditForm] = useState({ airbnbIcalUrl: "", vrboIcalUrl: "", cleaningDuration: "", cleaningFee: "", accessInstructions: "" })
+  const [editForm, setEditForm] = useState({
+    bedrooms: "", bathrooms: "", airbnbIcalUrl: "", vrboIcalUrl: "", cleaningDuration: "", cleaningFee: "", checkoutTime: "",
+    doorCode: "", supplyClosetCode: "", wifiNetwork: "", wifiPassword: "", accessInstructions: "",
+  })
   const [editingSettings, setEditingSettings] = useState(false)
 
   useEffect(() => {
@@ -53,10 +59,17 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         if (!prop) { router.push("/properties"); return }
         setProperty(prop)
         setEditForm({
+          bedrooms: String(prop.bedrooms),
+          bathrooms: String(prop.bathrooms),
           airbnbIcalUrl: prop.airbnbIcalUrl || "",
           vrboIcalUrl: prop.vrboIcalUrl || "",
           cleaningDuration: String(prop.cleaningDuration),
           cleaningFee: String(prop.cleaningFee ?? 0),
+          checkoutTime: prop.checkoutTime || "11:00 AM",
+          doorCode: prop.doorCode || "",
+          supplyClosetCode: prop.supplyClosetCode || "",
+          wifiNetwork: prop.wifiNetwork || "",
+          wifiPassword: prop.wifiPassword || "",
           accessInstructions: prop.accessInstructions || "",
         })
         const template = prop.checklistTemplate
@@ -105,6 +118,37 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     } catch {}
     setSaving(false)
     setTimeout(() => setSaveMsg(""), 3000)
+  }
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingPhoto(true)
+    setPhotoError("")
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const uploadRes = await fetch("/api/upload/property", { method: "POST", body: formData })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) {
+        setPhotoError(uploadData.error || "Upload failed")
+        return
+      }
+      const saveRes = await fetch(`/api/properties/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: uploadData.imageUrl }),
+      })
+      if (saveRes.ok) {
+        const d = await saveRes.json()
+        setProperty(d.property)
+      }
+    } catch {
+      setPhotoError("Upload failed. Please try again.")
+    } finally {
+      setUploadingPhoto(false)
+      e.target.value = ""
+    }
   }
 
   const addRoom = () => {
@@ -182,10 +226,33 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
       <div className="p-6 max-w-3xl space-y-6">
         {/* Property overview */}
-        <Card>
+        <Card padding="none">
+          {/* Cover photo */}
+          <div className="relative group">
+            {property.imageUrl ? (
+              <img src={property.imageUrl} alt={property.name} className="w-full h-48 object-cover rounded-t-2xl" />
+            ) : (
+              <div className="w-full h-32 bg-slate-50 border-b border-slate-100 rounded-t-2xl flex items-center justify-center">
+                <div className="text-center text-slate-400">
+                  <Camera className="w-6 h-6 mx-auto mb-1" />
+                  <p className="text-xs">No thumbnail yet</p>
+                </div>
+              </div>
+            )}
+            <label className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/95 hover:bg-white shadow-sm border border-slate-200 rounded-full text-xs font-medium text-slate-700 cursor-pointer transition-colors">
+              {uploadingPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              {property.imageUrl ? "Change photo" : "Add photo"}
+              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploadingPhoto} />
+            </label>
+          </div>
+          {photoError && (
+            <p className="px-5 pt-3 text-sm text-red-600">{photoError}</p>
+          )}
+
+          <div className="p-5">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-6 h-6 text-blue-600" />
               </div>
               <div>
@@ -202,7 +269,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div className="flex items-center gap-2 text-slate-600">
               <Bed className="w-4 h-4 text-slate-400" />
               {property.bedrooms} bedrooms
@@ -214,6 +281,10 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center gap-2 text-slate-600">
               <Clock className="w-4 h-4 text-slate-400" />
               {property.cleaningDuration} min clean
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <Clock className="w-4 h-4 text-slate-400" />
+              Checkout {property.checkoutTime}
             </div>
           </div>
 
@@ -238,9 +309,59 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             )}
           </div>
 
+          {!editingSettings && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 mb-2">Access Codes</p>
+              {property.doorCode || property.supplyClosetCode || property.wifiNetwork || property.accessInstructions ? (
+                <div className="space-y-2">
+                  {property.doorCode && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-500">Front Door:</span>
+                      <span className="font-mono font-semibold text-slate-900">{property.doorCode}</span>
+                    </div>
+                  )}
+                  {property.supplyClosetCode && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-500">Supply Closet:</span>
+                      <span className="font-mono font-semibold text-slate-900">{property.supplyClosetCode}</span>
+                    </div>
+                  )}
+                  {property.wifiNetwork && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Wifi className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-500">WiFi:</span>
+                      <span className="font-mono font-semibold text-slate-900">{property.wifiNetwork}</span>
+                      {property.wifiPassword && <span className="text-slate-400">/ {property.wifiPassword}</span>}
+                    </div>
+                  )}
+                  {property.accessInstructions && (
+                    <div className="flex items-start gap-2 text-sm pt-1">
+                      <StickyNote className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-slate-700 whitespace-pre-line">{property.accessInstructions}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  No codes added yet — click <button onClick={() => setEditingSettings(true)} className="text-blue-600 hover:underline font-medium">Edit Settings</button> to add door codes, the supply closet code, WiFi, etc.
+                </p>
+              )}
+            </div>
+          )}
+
           {editingSettings && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
               className="mt-5 pt-5 border-t border-slate-100 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Bedrooms" type="number" icon={Bed}
+                  value={editForm.bedrooms} min="1" max="20"
+                  onChange={(e) => setEditForm((f) => ({ ...f, bedrooms: e.target.value }))} />
+                <Input label="Bathrooms" type="number" icon={Bath}
+                  value={editForm.bathrooms} min="1" max="20" step="0.5"
+                  onChange={(e) => setEditForm((f) => ({ ...f, bathrooms: e.target.value }))} />
+              </div>
               <Input label="Airbnb iCal URL" icon={Link2}
                 placeholder="https://www.airbnb.com/calendar/ical/..."
                 value={editForm.airbnbIcalUrl}
@@ -258,9 +379,34 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 min="0"
                 step="0.01"
                 onChange={(e) => setEditForm((f) => ({ ...f, cleaningFee: e.target.value }))} />
+              <Input label="Checkout Time" icon={Clock}
+                placeholder="11:00 AM"
+                value={editForm.checkoutTime}
+                onChange={(e) => setEditForm((f) => ({ ...f, checkoutTime: e.target.value }))} />
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-sm font-semibold text-slate-700 mb-3">Access Codes</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Front Door Code" icon={KeyRound}
+                    placeholder="1234"
+                    value={editForm.doorCode}
+                    onChange={(e) => setEditForm((f) => ({ ...f, doorCode: e.target.value }))} />
+                  <Input label="Supply Closet Code" icon={Package}
+                    placeholder="5678"
+                    value={editForm.supplyClosetCode}
+                    onChange={(e) => setEditForm((f) => ({ ...f, supplyClosetCode: e.target.value }))} />
+                  <Input label="WiFi Network" icon={Wifi}
+                    placeholder="BigHouseGuest"
+                    value={editForm.wifiNetwork}
+                    onChange={(e) => setEditForm((f) => ({ ...f, wifiNetwork: e.target.value }))} />
+                  <Input label="WiFi Password" icon={Wifi}
+                    placeholder="password123"
+                    value={editForm.wifiPassword}
+                    onChange={(e) => setEditForm((f) => ({ ...f, wifiPassword: e.target.value }))} />
+                </div>
+              </div>
               <Textarea
-                label="Entry / Access Instructions"
-                placeholder="e.g. Key lockbox code is 1234, located on front gate. Ring doorbell on arrival."
+                label="Other Notes"
+                placeholder="Anything else your cleaner needs — alarm code, gate code, pool code, special instructions..."
                 rows={3}
                 value={editForm.accessInstructions}
                 onChange={(e) => setEditForm((f) => ({ ...f, accessInstructions: e.target.value }))}
@@ -270,6 +416,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               </Button>
             </motion.div>
           )}
+          </div>
         </Card>
 
         {/* Checklist Template Editor */}

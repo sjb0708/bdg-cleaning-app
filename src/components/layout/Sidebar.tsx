@@ -78,7 +78,9 @@ export function Sidebar() {
     router.refresh()
   }
 
-  const NavContent = () => (
+  // Plain JSX value, not a nested component — defining a component inside
+  // render remounts it (and loses state) on every parent render
+  const navContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-4 border-b border-blue-800/50">
@@ -191,14 +193,14 @@ export function Sidebar() {
             >
               <X className="w-4 h-4" />
             </button>
-            <NavContent />
+            {navContent}
           </aside>
         </div>
       )}
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 h-screen bg-gradient-to-b from-blue-900 to-blue-950 fixed left-0 top-0 z-30 shadow-xl">
-        <NavContent />
+        {navContent}
       </aside>
     </>
   )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { assignCleanerToJob, buildChecklistItems } from "@/lib/jobs"
 
 export async function GET(req: NextRequest) {
   try {
@@ -52,26 +53,9 @@ export async function POST(req: NextRequest) {
     if (!property) return NextResponse.json({ error: "Property not found" }, { status: 404 })
 
     // Use checklist template items if available, otherwise use defaults
-    const checklistItems =
-      property.checklistTemplate && property.checklistTemplate.items.length > 0
-        ? property.checklistTemplate.items.map((item) => ({
-            label: item.label,
-            room: item.room,
-            order: item.order,
-            completed: false,
-          }))
-        : [
-            { label: "Vacuum all floors", room: "General", order: 0, completed: false },
-            { label: "Mop hard floors", room: "General", order: 1, completed: false },
-            { label: "Empty all trash cans", room: "General", order: 2, completed: false },
-            { label: "Clean bathrooms", room: "Bathroom", order: 3, completed: false },
-            { label: "Replace towels and toiletries", room: "Bathroom", order: 4, completed: false },
-            { label: "Make all beds with fresh linens", room: "Bedroom", order: 5, completed: false },
-            { label: "Clean kitchen counters and appliances", room: "Kitchen", order: 6, completed: false },
-            { label: "Final walkthrough", room: "General", order: 7, completed: false },
-          ]
+    const checklistItems = buildChecklistItems(property)
 
-    const job = await prisma.job.create({
+    const created = await prisma.job.create({
       data: {
         propertyId,
         hostId: user.userId,
@@ -79,10 +63,18 @@ export async function POST(req: NextRequest) {
         duration: property.cleaningDuration,
         notes: notes || null,
         bookingId: bookingId || null,
-        cleanerId: cleanerId || null,
-        status: cleanerId ? "ASSIGNED" : "UNASSIGNED",
+        status: "UNASSIGNED",
         checklistItems: { create: checklistItems },
       },
+    })
+
+    // Assignment always goes through the accept/decline flow — never straight to ASSIGNED
+    if (cleanerId) {
+      await assignCleanerToJob(created.id, cleanerId)
+    }
+
+    const job = await prisma.job.findUnique({
+      where: { id: created.id },
       include: {
         property: true,
         cleaner: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -90,19 +82,6 @@ export async function POST(req: NextRequest) {
         checklistItems: { orderBy: { order: "asc" } },
       },
     })
-
-    // Create in-app notification for cleaner if assigned
-    if (cleanerId) {
-      await prisma.notification.create({
-        data: {
-          userId: cleanerId,
-          jobId: job.id,
-          type: "JOB_ASSIGNED",
-          title: "New Job Assigned",
-          message: `You have been assigned a cleaning job at ${property.name} on ${new Date(scheduledDate).toLocaleDateString()}.`,
-        },
-      })
-    }
 
     return NextResponse.json({ job }, { status: 201 })
   } catch (error) {

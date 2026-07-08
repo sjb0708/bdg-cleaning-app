@@ -13,21 +13,20 @@ export async function GET() {
     const weekEnd = endOfWeek(now)
 
     const [totalProperties, unassignedJobs, assignedJobs, upcomingThisWeek, openIssues, pendingSupplies] = await Promise.all([
-      prisma.property.count({ where: { hostId: user.userId } }),
-      prisma.job.count({ where: { hostId: user.userId, status: "UNASSIGNED" } }),
-      prisma.job.count({ where: { hostId: user.userId, status: { in: ["ASSIGNED", "PENDING_ACCEPTANCE", "IN_PROGRESS"] } } }),
+      prisma.property.count(),
+      prisma.job.count({ where: { status: "UNASSIGNED" } }),
+      prisma.job.count({ where: { status: { in: ["ASSIGNED", "PENDING_ACCEPTANCE", "IN_PROGRESS"] } } }),
       prisma.job.count({
         where: {
-          hostId: user.userId,
           scheduledDate: { gte: weekStart, lte: weekEnd },
           status: { notIn: ["CANCELLED"] },
         },
       }),
       prisma.issueReport.count({
-        where: { property: { hostId: user.userId }, status: "OPEN" },
+        where: { status: "OPEN" },
       }),
       prisma.supplyRequest.count({
-        where: { property: { hostId: user.userId }, status: "PENDING" },
+        where: { status: "PENDING" },
       }),
     ])
 

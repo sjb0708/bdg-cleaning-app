@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { completeJob } from "@/lib/jobs"
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -31,10 +32,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const allDone = allItems.every((i) => (i.id === id ? completed : i.completed))
 
     if (allDone && item.job.status !== "COMPLETED") {
-      await prisma.job.update({
-        where: { id: item.jobId },
-        data: { status: "COMPLETED", completedAt: new Date() },
-      })
+      // Shared helper: payment + admin notification, same as Mark Complete
+      await completeJob(item.jobId)
     }
 
     return NextResponse.json({ item: updated, jobCompleted: allDone })

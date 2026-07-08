@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/utils"
 import type { Notification } from "@/types"
 import {
   Bell, BriefcaseBusiness, CalendarCheck, CalendarX,
-  Info, CheckCheck, Clock,
+  Info, CheckCheck, CheckCircle2, XCircle,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
@@ -20,12 +20,14 @@ function typeIcon(type: Notification["type"]) {
   switch (type) {
     case "JOB_ASSIGNED":
       return { Icon: BriefcaseBusiness, bg: "bg-blue-50", color: "text-blue-600" }
-    case "JOB_UPDATED":
+    case "JOB_ACCEPTED":
+      return { Icon: CheckCircle2, bg: "bg-emerald-50", color: "text-emerald-600" }
+    case "JOB_DECLINED":
+      return { Icon: XCircle, bg: "bg-red-50", color: "text-red-500" }
+    case "JOB_COMPLETED":
       return { Icon: CalendarCheck, bg: "bg-purple-50", color: "text-purple-600" }
     case "JOB_CANCELLED":
       return { Icon: CalendarX, bg: "bg-red-50", color: "text-red-500" }
-    case "JOB_REMINDER":
-      return { Icon: Clock, bg: "bg-amber-50", color: "text-amber-600" }
     default:
       return { Icon: Info, bg: "bg-slate-50", color: "text-slate-500" }
   }

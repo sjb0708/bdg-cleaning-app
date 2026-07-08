@@ -84,9 +84,3 @@ export const STATUS_COLORS: Record<string, string> = {
   // legacy
   OPEN: "bg-amber-100 text-amber-700",
 }
-
-export const PLATFORM_COLORS: Record<string, string> = {
-  AIRBNB: "bg-rose-100 text-rose-700",
-  VRBO: "bg-blue-100 text-blue-700",
-  MANUAL: "bg-slate-100 text-slate-700",
-}

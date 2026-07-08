@@ -14,6 +14,7 @@ import {
   Building2, MapPin, Calendar, Clock, CheckCircle2, Circle,
   ArrowLeft, AlertCircle, UserCheck, FileText, ThumbsUp, ThumbsDown,
   TriangleAlert, Camera, X, ImagePlus, DollarSign, ShoppingCart, Package, Truck,
+  KeyRound, Wifi, StickyNote, Zap,
 } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -40,7 +41,7 @@ interface AssignModalProps {
   onClose: () => void
   jobId: string
   currentCleanerId?: string | null
-  onAssigned: (cleaner: User) => void
+  onAssigned: () => void
 }
 
 function AssignCleanerModal({ open, onClose, jobId, currentCleanerId, onAssigned }: AssignModalProps) {
@@ -73,8 +74,7 @@ function AssignCleanerModal({ open, onClose, jobId, currentCleanerId, onAssigned
         setError(d.error ?? "Failed to assign cleaner.")
         return
       }
-      const cleaner = cleaners.find((c) => c.id === selectedId)
-      if (cleaner) onAssigned(cleaner)
+      onAssigned()
       onClose()
     } catch {
       setError("Something went wrong.")
@@ -201,6 +201,17 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
     }
   }
 
+  // Refetch rather than guess at the resulting status client-side — assigning
+  // a cleaner lands the job in PENDING_ACCEPTANCE, not ASSIGNED, until they
+  // actually accept, and that distinction matters enough to get from the server.
+  async function reloadJob() {
+    const res = await fetch(`/api/jobs/${job.id}`)
+    if (res.ok) {
+      const d = await res.json()
+      setJob(d.job ?? d)
+    }
+  }
+
   async function markAsPaid() {
     if (!payment) return
     setMarkingPaid(true)
@@ -299,13 +310,13 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                     <div>
                       <p className="text-xs text-slate-400 mb-1">Platform</p>
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        job.booking.platform === "AIRBNB"
+                        job.booking.platform?.toLowerCase() === "airbnb"
                           ? "bg-rose-100 text-rose-700"
-                          : job.booking.platform === "VRBO"
+                          : job.booking.platform?.toLowerCase() === "vrbo"
                           ? "bg-blue-100 text-blue-700"
                           : "bg-slate-100 text-slate-600"
                       }`}>
-                        {job.booking.platform}
+                        {job.booking.platform?.toLowerCase() === "airbnb" ? "Airbnb" : job.booking.platform?.toLowerCase() === "vrbo" ? "VRBO" : job.booking.platform}
                       </span>
                     </div>
                   </div>
@@ -504,15 +515,24 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                         )}
                       </div>
                     </div>
-                    {/* Audit trail */}
-                    <div className="bg-slate-50 rounded-xl px-3 py-2.5 space-y-1">
-                      <p className="text-xs text-slate-500">
-                        <span className="font-medium text-slate-700">Assigned by</span> {job.host?.name ?? "Admin"}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Job created {new Date(job.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                    </div>
+                    {/* A cleaner being set does NOT mean they've accepted — check
+                        status explicitly so this can't show "assigned" while the
+                        job is still just an unanswered offer sitting in their inbox */}
+                    {job.status === "PENDING_ACCEPTANCE" ? (
+                      <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 rounded-xl p-3">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        Awaiting cleaner confirmation
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 rounded-xl px-3 py-2.5 space-y-1">
+                        <p className="text-xs text-slate-500">
+                          <span className="font-medium text-slate-700">Assigned by</span> {job.host?.name ?? "Admin"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Job created {new Date(job.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                    )}
                     {job.status !== "COMPLETED" && job.status !== "CANCELLED" && (
                       <Button
                         variant="outline"
@@ -523,16 +543,6 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                         <UserCheck className="w-4 h-4" /> Reassign
                       </Button>
                     )}
-                  </div>
-                ) : job.status === "PENDING_ACCEPTANCE" ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 rounded-xl p-3">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      Awaiting cleaner confirmation
-                    </div>
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAssign(true)}>
-                      <UserCheck className="w-4 h-4" /> Reassign
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -548,31 +558,32 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
               </Card>
             </motion.div>
 
-            {/* Timeline */}
+            {/* Schedule — deliberately just the one fact that matters: when the
+                cleaning happens. Next-check-in is never shown here; that used
+                to display the CURRENT booking's own check-in date mislabeled
+                as "next," which was both wrong and more than a cleaner needs
+                to know. A same-day-turnover flag (no guest dates) covers the
+                "clean fast" signal without exposing booking details that can
+                still change. */}
             {job.booking && (
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
                 <Card>
-                  <CardTitle className="mb-4">Timeline</CardTitle>
-                  <div className="space-y-4">
-                    {[
-                      { label: "Guest check-out", time: job.booking.checkOut, color: "bg-rose-400" },
-                      { label: "Cleaning starts", time: job.scheduledDate, color: "bg-blue-500" },
-                      { label: "Next check-in", time: job.booking.checkIn, color: "bg-emerald-400" },
-                    ].map((event, i) => (
-                      <div key={event.label} className="flex items-start gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 mt-0.5 ${event.color}`} />
-                          {i < 2 && <div className="w-0.5 h-8 bg-slate-200 mt-1" />}
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500">{event.label}</p>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {formatDateTime(event.time)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                  <CardTitle className="mb-4">Schedule</CardTitle>
+                  <div className="flex items-start gap-3">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1 bg-rose-400" />
+                    <div>
+                      <p className="text-xs text-slate-500">Guest checkout / cleaning scheduled</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {formatDateTime(job.scheduledDate)}
+                      </p>
+                    </div>
                   </div>
+                  {job.isTurnover && (
+                    <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-xl p-3 mt-4">
+                      <Zap className="w-4 h-4 flex-shrink-0 fill-current" />
+                      <span><b>Same-day turnover</b> — a new guest checks in today, quick turnaround needed.</span>
+                    </div>
+                  )}
                 </Card>
               </motion.div>
             )}
@@ -659,7 +670,7 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
         onClose={() => setShowAssign(false)}
         jobId={job.id}
         currentCleanerId={job.cleanerId}
-        onAssigned={(cleaner) => setJob((j) => ({ ...j, cleaner, cleanerId: cleaner.id, status: "ASSIGNED" }))}
+        onAssigned={reloadJob}
       />
 
       {lightbox && (
@@ -1119,7 +1130,11 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
         </motion.div>
       )}
 
-      {/* Schedule info */}
+      {/* Schedule info — just the one date that matters. No "next check-in":
+          that used to show the CURRENT booking's own check-in mislabeled as
+          "next," which was wrong and more than a cleaner needs to know. The
+          turnover flag covers "clean fast today" without exposing a specific
+          incoming guest's date. */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Schedule</p>
@@ -1129,39 +1144,30 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
                 <Calendar className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-400">Cleaning date</p>
+                <p className="text-xs text-slate-400">Checkout date</p>
                 <p className="text-sm font-semibold text-slate-900">
-                  {formatDateShort(job.scheduledDate)}, {formatTime(job.scheduledDate)}
+                  {formatDateShort(job.scheduledDate)}
                 </p>
               </div>
             </div>
-            {job.booking && (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-4 h-4 text-rose-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Guest check-out</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {formatDate(job.booking.checkOut)} at {formatTime(job.booking.checkOut)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Next check-in</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {formatDate(job.booking.checkIn)} at {formatTime(job.booking.checkIn)}
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-rose-500" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Checkout time</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {job.property?.checkoutTime || "11:00 AM"}
+                </p>
+              </div>
+            </div>
           </div>
+          {job.isTurnover && (
+            <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-xl p-3 mt-3">
+              <Zap className="w-4 h-4 flex-shrink-0 fill-current" />
+              <span><b>Same-day turnover</b> — please plan for a quick clean.</span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -1181,22 +1187,44 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
             </div>
           ) : null}
 
-          {/* Access instructions */}
-          {job.property?.accessInstructions && (
+          {/* Access codes */}
+          {(job.property?.doorCode || job.property?.supplyClosetCode || job.property?.wifiNetwork || job.property?.accessInstructions) && (
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-                <FileText className="w-4 h-4 text-amber-600" />
+                <KeyRound className="w-4 h-4 text-amber-600" />
               </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Entry / Access Instructions</p>
-                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
-                  {job.property.accessInstructions}
-                </p>
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <p className="text-xs text-slate-400">Access Codes</p>
+                {job.property.doorCode && (
+                  <p className="text-sm text-slate-800 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    Front Door: <span className="font-mono font-semibold">{job.property.doorCode}</span>
+                  </p>
+                )}
+                {job.property.supplyClosetCode && (
+                  <p className="text-sm text-slate-800 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    Supply Closet: <span className="font-mono font-semibold">{job.property.supplyClosetCode}</span>
+                  </p>
+                )}
+                {job.property.wifiNetwork && (
+                  <p className="text-sm text-slate-800 flex items-center gap-1.5">
+                    <Wifi className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    WiFi: <span className="font-mono font-semibold">{job.property.wifiNetwork}</span>
+                    {job.property.wifiPassword && <span className="text-slate-500">/ {job.property.wifiPassword}</span>}
+                  </p>
+                )}
+                {job.property.accessInstructions && (
+                  <p className="text-sm text-slate-700 flex items-start gap-1.5 whitespace-pre-line">
+                    <StickyNote className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                    {job.property.accessInstructions}
+                  </p>
+                )}
               </div>
             </div>
           )}
 
-          {!job.property?.cleaningFee && !job.property?.accessInstructions && (
+          {!job.property?.cleaningFee && !job.property?.doorCode && !job.property?.supplyClosetCode && !job.property?.wifiNetwork && !job.property?.accessInstructions && (
             <p className="text-sm text-slate-400 text-center py-1">No additional details from host.</p>
           )}
         </div>
@@ -1390,23 +1418,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/jobs/${id}`)
-        if (res.status === 404) { setNotFound(true); return }
-        if (res.ok) {
-          const d = await res.json()
-          setJob(d.job ?? d)
-        }
-      } catch {
-        // silently fail
-      } finally {
-        setLoading(false)
+  async function loadJob() {
+    try {
+      const res = await fetch(`/api/jobs/${id}`)
+      if (res.status === 404) { setNotFound(true); return }
+      if (res.ok) {
+        const d = await res.json()
+        setJob(d.job ?? d)
       }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [id])
+  }
+
+  useEffect(() => { loadJob() }, [id])
 
   return (
     <div className="min-h-screen">
