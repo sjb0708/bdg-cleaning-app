@@ -240,7 +240,7 @@ interface PropertyGroupCardProps {
   onCreateJob: (b: BookingWithProperty) => void
 }
 
-const UPCOMING_PREVIEW_COUNT = 8
+const UPCOMING_PREVIEW_COUNT = 2
 
 function PropertyGroupCard({ group, onCreateJob }: PropertyGroupCardProps) {
   const { property, bookings } = group
