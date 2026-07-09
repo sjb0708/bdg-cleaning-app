@@ -1,7 +1,8 @@
 import crypto from "crypto"
 import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
-import { sendEmail, jobAssignedEmail } from "@/lib/email"
+import { jobAssignedEmail } from "@/lib/email"
+import { notifyCleaner } from "@/lib/notify"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
@@ -128,19 +129,20 @@ export async function assignCleanerToJob(jobId: string, cleanerId: string) {
   })
 
   const cleaner = await prisma.user.findUnique({ where: { id: cleanerId } })
-  if (cleaner?.emailNotifications && cleaner.email) {
-    await sendEmail({
-      to: cleaner.email,
+  if (cleaner) {
+    const respondUrl = `${APP_URL}/respond/${actionToken}`
+    await notifyCleaner(cleaner, {
       subject: `New cleaning job at ${job.property?.name} — ${dateStr}${turnover ? " (same-day turnover)" : ""}`,
-      html: jobAssignedEmail(
+      emailHtml: jobAssignedEmail(
         cleaner.name,
         job.property?.name ?? "",
         dateStr,
         `${APP_URL}/jobs/${jobId}`,
-        `${APP_URL}/respond/${actionToken}`,
+        respondUrl,
         turnover,
         checkoutTime
       ),
+      smsBody: `BDG Cleaning: New job at ${job.property?.name} on ${dateStr}. Checkout ${checkoutTime}.${turnover ? " Same-day turnover — quick turnaround needed." : ""} Accept or decline: ${respondUrl}`,
     })
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendEmail, jobAcceptedEmail, jobDeclinedEmail, cleanerConfirmedEmail } from "@/lib/email"
+import { notifyCleaner } from "@/lib/notify"
 import { format } from "date-fns"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       include: {
         property: true,
         host: { select: { id: true, name: true, email: true, emailNotifications: true } },
-        cleaner: { select: { id: true, name: true, email: true } },
+        cleaner: { select: { id: true, name: true, email: true, phone: true, notificationChannel: true, emailNotifications: true } },
       },
     })
 
@@ -76,11 +77,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           message: `Thanks for confirming — you're on the schedule for ${job.property?.name} on ${dateStr}.`,
         },
       })
-      if (job.cleaner?.email) {
-        await sendEmail({
-          to: job.cleaner.email,
+      if (job.cleaner) {
+        const checkoutTime = job.property?.checkoutTime ?? "11:00 AM"
+        await notifyCleaner(job.cleaner, {
           subject: `You're confirmed for ${job.property?.name} — ${dateStr}`,
-          html: cleanerConfirmedEmail(job.cleaner.name, job.property?.name ?? "", dateStr, job.property?.checkoutTime ?? "11:00 AM"),
+          emailHtml: cleanerConfirmedEmail(job.cleaner.name, job.property?.name ?? "", dateStr, checkoutTime),
+          smsBody: `BDG Cleaning: You're confirmed for ${job.property?.name} on ${dateStr}. Checkout ${checkoutTime}.`,
         })
       }
 

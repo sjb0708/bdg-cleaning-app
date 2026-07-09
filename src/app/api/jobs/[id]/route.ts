@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { assignCleanerToJob, completeJob, isSameDayTurnover } from "@/lib/jobs"
+import { assignCleanerToJob, completeJob, isSameDayTurnover, ensureJobForBooking } from "@/lib/jobs"
 import { format } from "date-fns"
+
+// After a job is cancelled, its booking still needs a cleaner unless the
+// checkout already passed — recreate an UNASSIGNED job so it doesn't
+// silently disappear from the calendar.
+async function recreateJobIfBookingStillNeedsOne(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { property: { include: { checklistTemplate: { include: { items: true } } } } },
+  })
+  if (!booking || !booking.property) return
+  await ensureJobForBooking(booking.property, booking)
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -101,17 +113,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
     })
 
-    // Notify admin if job was cancelled
-    if (user.role === "ADMIN" && body.status === "CANCELLED" && existing.cleanerId) {
-      await prisma.notification.create({
-        data: {
-          userId: existing.cleanerId,
-          jobId: id,
-          type: "JOB_CANCELLED",
-          title: "Job Cancelled",
-          message: `The cleaning job at ${existing.property?.name} on ${format(new Date(existing.scheduledDate), "MMM d")} has been cancelled.`,
-        },
-      })
+    if (user.role === "ADMIN" && body.status === "CANCELLED") {
+      // Notify the cleaner who was on it
+      if (existing.cleanerId) {
+        await prisma.notification.create({
+          data: {
+            userId: existing.cleanerId,
+            jobId: id,
+            type: "JOB_CANCELLED",
+            title: "Job Cancelled",
+            message: `The cleaning job at ${existing.property?.name} on ${format(new Date(existing.scheduledDate), "MMM d")} has been cancelled.`,
+          },
+        })
+      }
+
+      // The booking's checkout still needs a cleaner — cancelling the job
+      // shouldn't make that checkout silently vanish from the calendar.
+      if (existing.bookingId) {
+        await recreateJobIfBookingStillNeedsOne(existing.bookingId)
+      }
     }
 
     return NextResponse.json({ job })
@@ -143,6 +163,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     await prisma.job.update({ where: { id }, data: { status: "CANCELLED" } })
+    if (existing.bookingId) {
+      await recreateJobIfBookingStillNeedsOne(existing.bookingId)
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error(error)
