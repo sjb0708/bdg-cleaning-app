@@ -41,7 +41,12 @@ export async function ensureJobForBooking(
   property: PropertyWithTemplate,
   booking: { id: string; checkOut: Date; guestName: string | null }
 ) {
-  if (booking.checkOut <= new Date()) return null
+  // Checkout is a date only (no time-of-day, per Airbnb/VRBO feeds), so
+  // compare by calendar day — otherwise a same-day cancellation past
+  // midnight would look "already past" and silently skip recreating the job.
+  const today = new Date()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  if (booking.checkOut < todayStart) return null
 
   const existingJob = await prisma.job.findFirst({
     where: { bookingId: booking.id, status: { not: "CANCELLED" } },
@@ -108,7 +113,7 @@ export async function assignCleanerToJob(jobId: string, cleanerId: string) {
 
   await prisma.job.update({
     where: { id: jobId },
-    data: { cleanerId, status: "PENDING_ACCEPTANCE", actionToken, actionTokenExpiry },
+    data: { cleanerId, status: "PENDING_ACCEPTANCE", actionToken, actionTokenExpiry, unassignedAt: null },
   })
 
   // Date only, not date+time — Airbnb/VRBO calendar feeds only give a date for

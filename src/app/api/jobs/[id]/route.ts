@@ -79,12 +79,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (body.notes !== undefined) updateData.notes = body.notes
       if (body.scheduledDate !== undefined) updateData.scheduledDate = new Date(body.scheduledDate)
 
-      // Unassigning a cleaner; assigning goes through assignCleanerToJob below
+      // Unassigning a cleaner; assigning goes through assignCleanerToJob below.
+      // Stamping unassignedAt (rather than just relying on updatedAt) keeps a
+      // clear "pulled off this job at X" record even after a new cleaner is
+      // later assigned and updatedAt moves on.
       if (body.cleanerId !== undefined && !body.cleanerId) {
         updateData.cleanerId = null
         updateData.status = "UNASSIGNED"
         updateData.actionToken = null
         updateData.actionTokenExpiry = null
+        updateData.unassignedAt = new Date()
       }
     }
 
@@ -132,6 +136,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (existing.bookingId) {
         await recreateJobIfBookingStillNeedsOne(existing.bookingId)
       }
+    }
+
+    // Unassign (distinct from cancel): the job itself stays alive and open
+    // for a new cleaner, we just notify whoever was pulled off it.
+    const isUnassigning = user.role === "ADMIN" && body.cleanerId !== undefined && !body.cleanerId
+    if (isUnassigning && existing.cleanerId) {
+      await prisma.notification.create({
+        data: {
+          userId: existing.cleanerId,
+          jobId: id,
+          type: "JOB_CANCELLED",
+          title: "Removed From Job",
+          message: `You've been unassigned from the cleaning at ${existing.property?.name} on ${format(new Date(existing.scheduledDate), "MMM d")}. It's being reassigned to another cleaner.`,
+        },
+      })
     }
 
     return NextResponse.json({ job })

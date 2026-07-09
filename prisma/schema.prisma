@@ -100,6 +100,7 @@ model Job {
   duration          Int
   notes             String?
   completedAt       DateTime?
+  unassignedAt      DateTime?
   actionToken       String?   @unique
   actionTokenExpiry DateTime?
   createdAt     DateTime  @default(now())

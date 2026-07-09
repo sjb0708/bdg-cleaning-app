@@ -165,6 +165,7 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
   const [job, setJob] = useState(initialJob)
   const [showAssign, setShowAssign] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [unassigning, setUnassigning] = useState(false)
   const [payment, setPayment] = useState<Payment | null>(null)
   const [markingPaid, setMarkingPaid] = useState(false)
   const [issues, setIssues] = useState<IssueReportSummary[]>([])
@@ -198,6 +199,24 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
       if (res.ok) setJob((j) => ({ ...j, status: "CANCELLED" }))
     } finally {
       setCancelling(false)
+    }
+  }
+
+  // Pulls the current cleaner off without killing the job — keeps it open
+  // (status UNASSIGNED) and timestamped so a new cleaner can be assigned
+  // right after, instead of cancelling the whole job to swap cleaners.
+  async function unassignCleaner() {
+    if (!confirm("Unassign the current cleaner? The job will stay open for reassignment.")) return
+    setUnassigning(true)
+    try {
+      const res = await fetch(`/api/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cleanerId: null }),
+      })
+      if (res.ok) await reloadJob()
+    } finally {
+      setUnassigning(false)
     }
   }
 
@@ -533,15 +552,26 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                         </p>
                       </div>
                     )}
-                    {job.status !== "COMPLETED" && job.status !== "CANCELLED" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setShowAssign(true)}
-                      >
-                        <UserCheck className="w-4 h-4" /> Reassign
-                      </Button>
+                    {job.status !== "COMPLETED" && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setShowAssign(true)}
+                        >
+                          <UserCheck className="w-4 h-4" /> Reassign
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={unassignCleaner}
+                          disabled={unassigning}
+                        >
+                          {unassigning ? <Spinner size="sm" /> : "Unassign"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -550,9 +580,16 @@ function AdminJobDetail({ job: initialJob }: { job: Job }) {
                       <AlertCircle className="w-4 h-4 flex-shrink-0" />
                       No cleaner assigned yet
                     </div>
-                    <Button className="w-full" onClick={() => setShowAssign(true)}>
-                      <UserCheck className="w-4 h-4" /> Assign Cleaner
-                    </Button>
+                    {job.unassignedAt && (
+                      <p className="text-xs text-slate-400">
+                        Unassigned {formatDateTime(job.unassignedAt)}
+                      </p>
+                    )}
+                    {job.status !== "COMPLETED" && (
+                      <Button className="w-full" onClick={() => setShowAssign(true)}>
+                        <UserCheck className="w-4 h-4" /> Assign Cleaner
+                      </Button>
+                    )}
                   </div>
                 )}
               </Card>

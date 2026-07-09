@@ -76,6 +76,7 @@ export interface Job {
   duration: number
   notes?: string | null
   completedAt?: string | null
+  unassignedAt?: string | null
   createdAt: string
   property?: Property
   host?: User
