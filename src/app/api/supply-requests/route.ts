@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { sendEmail, supplyRequestedEmail } from "@/lib/email"
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 export async function GET(req: NextRequest) {
   try {
@@ -83,6 +86,21 @@ export async function POST(req: NextRequest) {
         message: `${user.name} requested supplies at ${job.property?.name}: ${itemList}.`,
       },
     })
+
+    if (job.host?.emailNotifications && job.host.email) {
+      await sendEmail({
+        to: job.host.email,
+        subject: `Supplies needed at ${job.property?.name}`,
+        html: supplyRequestedEmail(
+          job.host.name,
+          user.name,
+          job.property?.name ?? "",
+          items.join(", "),
+          notes ?? null,
+          `${APP_URL}/jobs/${jobId}`
+        ),
+      })
+    }
 
     return NextResponse.json({ request }, { status: 201 })
   } catch (error) {

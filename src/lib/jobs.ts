@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import { format } from "date-fns"
 import { prisma } from "@/lib/prisma"
-import { jobAssignedEmail } from "@/lib/email"
+import { sendEmail, jobAssignedEmail, jobCompletedEmail } from "@/lib/email"
 import { notifyCleaner } from "@/lib/notify"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
@@ -162,13 +162,17 @@ export async function completeJob(jobId: string) {
     include: {
       property: { select: { name: true, cleaningFee: true } },
       cleaner: { select: { id: true, name: true } },
+      host: { select: { id: true, name: true, email: true, emailNotifications: true } },
     },
   })
 
+  let paymentAmount: number | null = null
   if (job.cleanerId) {
     const existingPayment = await prisma.payment.findUnique({ where: { jobId } })
-    if (!existingPayment && (job.property?.cleaningFee ?? 0) > 0) {
-      await prisma.payment.create({
+    if (existingPayment) {
+      paymentAmount = existingPayment.amount
+    } else if ((job.property?.cleaningFee ?? 0) > 0) {
+      const payment = await prisma.payment.create({
         data: {
           jobId,
           cleanerId: job.cleanerId,
@@ -176,6 +180,7 @@ export async function completeJob(jobId: string) {
           amount: job.property!.cleaningFee,
         },
       })
+      paymentAmount = payment.amount
     }
   }
 
@@ -185,9 +190,25 @@ export async function completeJob(jobId: string) {
       jobId,
       type: "JOB_COMPLETED",
       title: "Job Completed ✓",
-      message: `${job.cleaner?.name ?? "The cleaner"} completed the cleaning at ${job.property?.name} on ${format(new Date(), "MMM d 'at' h:mm a")}.`,
+      message: `${job.cleaner?.name ?? "The cleaner"} completed the cleaning at ${job.property?.name} on ${format(new Date(), "MMM d 'at' h:mm a")}.${paymentAmount ? ` $${paymentAmount.toFixed(2)} due.` : ""}`,
     },
   })
+
+  if (job.host?.emailNotifications && job.host.email) {
+    const dateStr = format(new Date(job.scheduledDate), "EEEE, MMMM d")
+    await sendEmail({
+      to: job.host.email,
+      subject: `${job.cleaner?.name ?? "Cleaner"} completed the job at ${job.property?.name}`,
+      html: jobCompletedEmail(
+        job.host.name,
+        job.cleaner?.name ?? "The cleaner",
+        job.property?.name ?? "",
+        dateStr,
+        paymentAmount,
+        `${APP_URL}/jobs/${jobId}`
+      ),
+    })
+  }
 
   return job
 }

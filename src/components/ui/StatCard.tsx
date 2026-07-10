@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import { type LucideIcon } from "lucide-react"
+import Link from "next/link"
 import { Card } from "./Card"
 
 interface StatCardProps {
@@ -12,6 +13,7 @@ interface StatCardProps {
   iconBg?: string
   description?: string
   className?: string
+  href?: string
 }
 
 export function StatCard({
@@ -24,6 +26,7 @@ export function StatCard({
   iconBg = "bg-blue-50",
   description,
   className,
+  href,
 }: StatCardProps) {
   const changeColors = {
     positive: "text-emerald-600",
@@ -31,8 +34,8 @@ export function StatCard({
     neutral: "text-slate-500",
   }
 
-  return (
-    <Card className={cn("animate-fade-in", className)}>
+  const content = (
+    <Card className={cn("animate-fade-in", href && "hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer", className)}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm text-slate-500 font-medium">{title}</p>
@@ -49,4 +52,6 @@ export function StatCard({
       </div>
     </Card>
   )
+
+  return href ? <Link href={href}>{content}</Link> : content
 }

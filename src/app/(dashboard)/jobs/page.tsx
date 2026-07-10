@@ -152,7 +152,12 @@ function AdminJobsView() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [allProperties, setAllProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<StatusFilter>("ALL")
+
+  // Pre-filter by status from URL (e.g. from a dashboard stat card link);
+  // the filter pills below take over as the source of truth after that
+  const statusParam = searchParams.get("status") as StatusFilter | null
+  const validStatusParam = statusParam && STATUS_FILTERS.some((f) => f.value === statusParam) ? statusParam : "ALL"
+  const [filter, setFilter] = useState<StatusFilter>(validStatusParam)
   const [search, setSearch] = useState("")
   const [showCreate, setShowCreate] = useState(false)
 

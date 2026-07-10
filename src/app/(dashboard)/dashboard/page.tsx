@@ -79,6 +79,7 @@ function AdminDashboard() {
       iconBg: "bg-blue-50",
       change: "Managed properties",
       changeType: "neutral" as const,
+      href: "/properties",
     },
     {
       title: "Unassigned Jobs",
@@ -88,6 +89,7 @@ function AdminDashboard() {
       iconBg: "bg-amber-50",
       change: stats?.unassignedJobs ? "Need cleaner assigned" : "All covered",
       changeType: (stats?.unassignedJobs ? "negative" : "positive") as "negative" | "positive",
+      href: "/jobs?status=UNASSIGNED",
     },
     {
       title: "Assigned Jobs",
@@ -97,6 +99,7 @@ function AdminDashboard() {
       iconBg: "bg-blue-50",
       change: "Cleaners confirmed",
       changeType: "positive" as const,
+      href: "/jobs?status=ASSIGNED",
     },
     {
       title: "This Week",
@@ -106,6 +109,7 @@ function AdminDashboard() {
       iconBg: "bg-purple-50",
       change: "Upcoming cleanings",
       changeType: "neutral" as const,
+      href: "/calendar",
     },
   ]
 

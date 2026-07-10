@@ -5,7 +5,11 @@
 
 interface EmailOptions {
   to: string
-  subject: string
+  // Optional since carrier SMS gateways (lib/sms.ts) send bare text with no
+  // real subject line of their own. Note: omitting it entirely does NOT
+  // avoid a gateway-inserted "no subject" placeholder (confirmed on
+  // T-Mobile's tmomail.net) — sms.ts sends a short real subject instead.
+  subject?: string
   html: string
 }
 
@@ -24,7 +28,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
       await transporter.sendMail({
         from: `"BDG Cleaning" <${gmailUser}>`,
         to,
-        subject,
+        ...(subject ? { subject } : {}),
         html,
       })
       return
@@ -39,7 +43,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
     try {
       const { Resend } = await import("resend")
       const resend = new Resend(resendKey)
-      await resend.emails.send({ from: fromEmail, to, subject, html })
+      await resend.emails.send({ from: fromEmail, to, subject: subject || "", html })
       return
     } catch (err) {
       console.error("Resend send failed:", err)
@@ -173,6 +177,102 @@ export function jobAcceptedEmail(adminName: string, cleanerName: string, propert
           <p style="margin: 0; font-weight: bold; color: #0f172a;">${date}</p>
         </div>
         <a href="${jobUrl}" style="display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          View Job
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bailey Development Group Cleaning Management</p>
+      </div>
+    </div>
+  `
+}
+
+export function jobStartedEmail(adminName: string, cleanerName: string, propertyName: string, date: string, jobUrl: string) {
+  return `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #ea580c; padding: 24px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 20px;">Cleaner Has Arrived</h1>
+        <p style="color: #fed7aa; margin: 4px 0 0;">Bailey Development Group</p>
+      </div>
+      <div style="background: white; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <p style="color: #334155;">Hi ${adminName},</p>
+        <p style="color: #334155;"><b>${cleanerName}</b> checked in and started cleaning.</p>
+        <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 8px; color: #64748b; font-size: 14px;">PROPERTY</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${propertyName}</p>
+          <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">DATE</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${date}</p>
+        </div>
+        <a href="${jobUrl}" style="display: inline-block; background: #ea580c; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          View Job
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bailey Development Group Cleaning Management</p>
+      </div>
+    </div>
+  `
+}
+
+export function jobCompletedEmail(
+  adminName: string,
+  cleanerName: string,
+  propertyName: string,
+  date: string,
+  amount: number | null,
+  jobUrl: string
+) {
+  const payBlock = amount
+    ? `
+        <div style="background: #fefce8; border: 1px solid #fde047; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0; font-weight: bold; color: #854d0e;">💰 Please pay ${cleanerName}</p>
+          <p style="margin: 4px 0 0; color: #854d0e; font-size: 14px;">$${amount.toFixed(2)} due for this job.</p>
+        </div>`
+    : ""
+  return `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #059669; padding: 24px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 20px;">Job Completed ✓</h1>
+        <p style="color: #a7f3d0; margin: 4px 0 0;">Bailey Development Group</p>
+      </div>
+      <div style="background: white; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <p style="color: #334155;">Hi ${adminName},</p>
+        <p style="color: #334155;"><b>${cleanerName}</b> finished the cleaning and completed the checklist.</p>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 8px; color: #64748b; font-size: 14px;">PROPERTY</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${propertyName}</p>
+          <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">DATE</p>
+          <p style="margin: 0; font-weight: bold; color: #0f172a;">${date}</p>
+        </div>
+        ${payBlock}
+        <a href="${jobUrl}" style="display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          View Job &amp; Pay
+        </a>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bailey Development Group Cleaning Management</p>
+      </div>
+    </div>
+  `
+}
+
+export function supplyRequestedEmail(
+  adminName: string,
+  cleanerName: string,
+  propertyName: string,
+  itemList: string,
+  notes: string | null,
+  jobUrl: string
+) {
+  return `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #7c3aed; padding: 24px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 20px;">Supplies Needed</h1>
+        <p style="color: #ddd6fe; margin: 4px 0 0;">Bailey Development Group</p>
+      </div>
+      <div style="background: white; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+        <p style="color: #334155;">Hi ${adminName},</p>
+        <p style="color: #334155;"><b>${cleanerName}</b> requested supplies at <b>${propertyName}</b>.</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0 0 6px; color: #64748b; font-size: 14px;">ITEMS</p>
+          <p style="margin: 0 0 12px; font-weight: bold; color: #0f172a;">${itemList}</p>
+          ${notes ? `<p style="margin: 0 0 6px; color: #64748b; font-size: 14px;">NOTES</p><p style="margin: 0; color: #0f172a;">${notes}</p>` : ""}
+        </div>
+        <a href="${jobUrl}" style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
           View Job
         </a>
         <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Bailey Development Group Cleaning Management</p>

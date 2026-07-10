@@ -33,9 +33,14 @@ export async function sendSMSViaCarrierGateway(
   if (!phone || !carrier) return false
   const address = toGatewayAddress(phone, carrier)
   if (!address) return false
-  // No subject: most gateways prepend the subject line to the message body,
-  // and SMS has no room to spare for it.
-  await sendEmail({ to: address, subject: "", html: body })
+  // A short subject is required, not optional — gateways that don't get one
+  // (confirmed on T-Mobile's tmomail.net) fill the gap with a literal "no
+  // subject" placeholder ahead of the body. Callers' bodies are shared with
+  // the Twilio fallback (which has no subject line of its own) and so start
+  // with "BDG Cleaning: " — strip that here since the gateway subject
+  // already covers it, or it'd show up twice.
+  const gatewayBody = body.replace(/^BDG Cleaning:\s*/, "")
+  await sendEmail({ to: address, subject: "BDG Cleaning", html: gatewayBody })
   return true
 }
 
