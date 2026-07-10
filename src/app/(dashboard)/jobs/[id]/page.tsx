@@ -14,7 +14,7 @@ import {
   Building2, MapPin, Calendar, Clock, CheckCircle2, Circle,
   ArrowLeft, AlertCircle, UserCheck, FileText, ThumbsUp, ThumbsDown,
   TriangleAlert, Camera, X, ImagePlus, DollarSign, ShoppingCart, Package, Truck,
-  KeyRound, Wifi, StickyNote, Zap,
+  KeyRound, Wifi, StickyNote, Zap, Lock,
 } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -1267,73 +1267,9 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
         </div>
       </motion.div>
 
-      {/* Checklist */}
-      {checklist.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-50">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-semibold text-slate-900">Cleaning Checklist</p>
-                <span className="text-sm font-bold text-slate-700">{done}/{checklist.length}</span>
-              </div>
-              <ProgressBar pct={pct} />
-              <p className="text-xs text-slate-400 mt-1.5">{pct}% complete</p>
-            </div>
-
-            {allDone && job.status !== "COMPLETED" && (
-              <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                <p className="text-sm font-semibold text-emerald-900">All items checked! Mark the job complete below.</p>
-              </div>
-            )}
-
-            {job.status === "COMPLETED" && (
-              <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-emerald-900">Job Complete!</p>
-                  <p className="text-xs text-emerald-700">Great work — this cleaning is done.</p>
-                </div>
-              </div>
-            )}
-
-            {rooms.map((room) => (
-              <div key={room}>
-                <div className="px-4 py-2 bg-slate-50">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{room}</p>
-                </div>
-                {checklist
-                  .filter((c) => (c.room ?? "General") === room)
-                  .sort((a, b) => a.order - b.order)
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => toggleItem(item)}
-                      disabled={savingId === item.id || job.status === "COMPLETED"}
-                      className="w-full flex items-center gap-4 px-4 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left min-h-[56px] disabled:opacity-70"
-                    >
-                      {savingId === item.id ? (
-                        <Spinner size="sm" className="flex-shrink-0" />
-                      ) : item.completed ? (
-                        <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-6 h-6 text-slate-300 flex-shrink-0" />
-                      )}
-                      <span className={`text-sm font-medium ${item.completed ? "line-through text-slate-400" : "text-slate-800"}`}>
-                        {item.label}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Action buttons */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="space-y-3">
-
-        {/* Accept / Decline for pending jobs */}
+      {/* Accept / Decline for pending jobs, and Start Cleaning check-in — both
+          gate the checklist below, so they come first, not buried under it */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="space-y-3">
         {job.status === "PENDING_ACCEPTANCE" && (
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
             <div className="flex items-start gap-3">
@@ -1369,9 +1305,85 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
             onClick={() => updateStatus("IN_PROGRESS")}
             disabled={updatingStatus}
           >
-            {updatingStatus ? <Spinner size="sm" /> : "Start Cleaning"}
+            {updatingStatus ? <Spinner size="sm" /> : "Start Cleaning — I'm Here"}
           </Button>
         )}
+      </motion.div>
+
+      {/* Checklist */}
+      {checklist.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-50">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-semibold text-slate-900">Cleaning Checklist</p>
+                <span className="text-sm font-bold text-slate-700">{done}/{checklist.length}</span>
+              </div>
+              <ProgressBar pct={pct} />
+              <p className="text-xs text-slate-400 mt-1.5">{pct}% complete</p>
+            </div>
+
+            {(job.status === "PENDING_ACCEPTANCE" || job.status === "ASSIGNED") && (
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                <p className="text-sm text-slate-500">
+                  {job.status === "PENDING_ACCEPTANCE" ? "Accept the job to unlock the checklist." : "Tap “Start Cleaning” above once you've checked in."}
+                </p>
+              </div>
+            )}
+
+            {allDone && job.status !== "COMPLETED" && (
+              <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                <p className="text-sm font-semibold text-emerald-900">All items checked! Mark the job complete below.</p>
+              </div>
+            )}
+
+            {job.status === "COMPLETED" && (
+              <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-emerald-900">Job Complete!</p>
+                  <p className="text-xs text-emerald-700">Great work — this cleaning is done.</p>
+                </div>
+              </div>
+            )}
+
+            {rooms.map((room) => (
+              <div key={room}>
+                <div className="px-4 py-2 bg-slate-50">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{room}</p>
+                </div>
+                {checklist
+                  .filter((c) => (c.room ?? "General") === room)
+                  .sort((a, b) => a.order - b.order)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => toggleItem(item)}
+                      disabled={savingId === item.id || job.status !== "IN_PROGRESS"}
+                      className="w-full flex items-center gap-4 px-4 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left min-h-[56px] disabled:opacity-70"
+                    >
+                      {savingId === item.id ? (
+                        <Spinner size="sm" className="flex-shrink-0" />
+                      ) : item.completed ? (
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <Circle className="w-6 h-6 text-slate-300 flex-shrink-0" />
+                      )}
+                      <span className={`text-sm font-medium ${item.completed ? "line-through text-slate-400" : "text-slate-800"}`}>
+                        {item.label}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Action buttons */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="space-y-3">
         {job.status === "IN_PROGRESS" && (
           <Button
             className="w-full min-h-[52px] text-base"
