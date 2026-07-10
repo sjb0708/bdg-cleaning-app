@@ -10,7 +10,7 @@ import { motion } from "framer-motion"
 import {
   Building2, MapPin, Bed, Bath, Clock, Link2, Plus, Trash2,
   GripVertical, Save, ArrowLeft, Wifi, WifiOff, ChevronDown, ChevronUp, DollarSign, Camera, Loader2,
-  KeyRound, Package, StickyNote
+  KeyRound, Package, StickyNote, ShoppingCart
 } from "lucide-react"
 import Link from "next/link"
 import type { Property, ChecklistTemplateItem } from "@/types"
@@ -43,6 +43,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [collapsedRooms, setCollapsedRooms] = useState<Set<string>>(new Set())
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState("")
+  const [supplies, setSupplies] = useState<string[]>([])
+  const [newSupplyName, setNewSupplyName] = useState("")
+  const [savingSupplies, setSavingSupplies] = useState(false)
 
   // Edit property fields
   const [editForm, setEditForm] = useState({
@@ -76,6 +79,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         if (template?.items?.length) {
           setRooms(groupByRoom(template.items))
         }
+        setSupplies((prop.supplyItems ?? []).map((s: { name: string }) => s.name))
       })
       .catch(() => router.push("/properties"))
       .finally(() => setLoading(false))
@@ -97,6 +101,35 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       setSaveMsg("Save failed")
     } finally {
       setSaving(false)
+      setTimeout(() => setSaveMsg(""), 3000)
+    }
+  }
+
+  const addSupply = () => {
+    const name = newSupplyName.trim()
+    if (!name || supplies.includes(name)) return
+    setSupplies((s) => [...s, name])
+    setNewSupplyName("")
+  }
+
+  const removeSupply = (name: string) => {
+    setSupplies((s) => s.filter((n) => n !== name))
+  }
+
+  const saveSupplies = async () => {
+    setSavingSupplies(true)
+    setSaveMsg("")
+    try {
+      const res = await fetch(`/api/properties/${id}/supplies`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: supplies }),
+      })
+      setSaveMsg(res.ok ? "Supply list saved!" : "Save failed")
+    } catch {
+      setSaveMsg("Save failed")
+    } finally {
+      setSavingSupplies(false)
       setTimeout(() => setSaveMsg(""), 3000)
     }
   }
@@ -505,6 +538,53 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               </p>
               <Button onClick={saveChecklist} loading={saving} size="sm">
                 <Save className="w-4 h-4" /> Save Checklist
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Supply List — what this specific property shows a cleaner in
+            "Request Supplies," so BigHouse 2040 and Small House 2725 can
+            stock (and thus offer) different things instead of one generic
+            list shared by every property. */}
+        <Card padding="none">
+          <CardHeader className="p-5 pb-0">
+            <CardTitle>Supply List</CardTitle>
+            <p className="text-sm text-slate-500 mt-0.5">What your cleaner can request for this property — they'll see exactly this list.</p>
+          </CardHeader>
+
+          <div className="p-5 space-y-4">
+            {supplies.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {supplies.map((name) => (
+                  <span key={name} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-blue-50 text-blue-700 text-sm font-medium rounded-full border border-blue-100">
+                    {name}
+                    <button type="button" onClick={() => removeSupply(name)} className="p-0.5 text-blue-400 hover:text-blue-700">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newSupplyName}
+                onChange={(e) => setNewSupplyName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSupply())}
+                placeholder="New supply item (e.g. Coffee Pods)"
+                className="flex-1 px-3 py-2.5 text-sm border border-dashed border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={addSupply}>
+                <Plus className="w-4 h-4" /> Add
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <p className="text-sm text-slate-500">{supplies.length} items</p>
+              <Button onClick={saveSupplies} loading={savingSupplies} size="sm">
+                <ShoppingCart className="w-4 h-4" /> Save Supply List
               </Button>
             </div>
           </div>

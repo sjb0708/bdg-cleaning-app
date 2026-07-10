@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const job = await prisma.job.findUnique({
       where: { id },
       include: {
-        property: true,
+        property: { include: { supplyItems: { orderBy: { order: "asc" } } } },
         host: { select: { id: true, name: true, email: true, avatarUrl: true, phone: true } },
         cleaner: { select: { id: true, name: true, email: true, avatarUrl: true, phone: true, location: true } },
         booking: true,
@@ -137,7 +137,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const job = await prisma.job.findUnique({
       where: { id },
       include: {
-        property: true,
+        property: { include: { supplyItems: { orderBy: { order: "asc" } } } },
         cleaner: { select: { id: true, name: true, email: true, avatarUrl: true } },
         checklistItems: { orderBy: { order: "asc" } },
       },

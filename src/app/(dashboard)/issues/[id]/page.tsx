@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button"
 import { Spinner } from "@/components/ui/Spinner"
 import { Avatar } from "@/components/ui/Avatar"
 import { formatDateTime } from "@/lib/utils"
-import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, X } from "lucide-react"
+import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, X, DollarSign, Copy, Check, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import type { IssueReport } from "@/types"
@@ -26,6 +26,21 @@ const STATUS_OPTIONS = [
   { value: "RESOLVED", label: "Resolved" },
 ]
 
+// Types a host could plausibly file with Airbnb — mirrors the cleaner-side
+// attestation gate in the Report Issue modal.
+const AIRBNB_CLAIMABLE_TYPES = new Set(["DAMAGE", "BROKEN_ITEM", "STAIN", "PEST"])
+
+// Airbnb requires filing in the Resolution Center within 14 days of the
+// responsible guest's checkout (job.scheduledDate is that checkout date) —
+// or before the next guest checks in, whichever is sooner. This tracks only
+// the 14-day rule, since the app doesn't know the next booking's check-in.
+const AIRBNB_FILING_WINDOW_DAYS = 14
+
+function daysLeftToFile(checkoutDate: string): number {
+  const deadline = new Date(checkoutDate).getTime() + AIRBNB_FILING_WINDOW_DAYS * 24 * 60 * 60 * 1000
+  return Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000))
+}
+
 export default function IssueDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -33,6 +48,7 @@ export default function IssueDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetch(`/api/issues/${id}`)
@@ -57,6 +73,25 @@ export default function IssueDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  async function copyForAirbnb() {
+    if (!issue) return
+    const lines = [
+      `Property: ${issue.property?.name ?? ""}${issue.property?.address ? ` — ${issue.property.address}, ${issue.property.city}, ${issue.property.state}` : ""}`,
+      issue.job ? `Guest checkout date: ${formatDateTime(issue.job.scheduledDate)}` : null,
+      `Type: ${TYPE_LABELS[issue.type] ?? issue.type}`,
+      `Severity: ${SEVERITY_CONFIG[issue.severity]?.label ?? issue.severity}`,
+      `Description: ${issue.description}`,
+      issue.estimatedCost ? `Estimated repair/replacement cost: $${issue.estimatedCost.toFixed(2)}` : null,
+      issue.reportedBy ? `Reported by: ${issue.reportedBy.name} on ${formatDateTime(issue.createdAt)}` : null,
+      `Photos confirmed original by reporter: ${issue.photosConfirmedOriginal ? "Yes" : "No"}`,
+      issue.photos?.length ? `Photos:\n${issue.photos.map((p) => p.url).join("\n")}` : null,
+    ].filter(Boolean)
+
+    await navigator.clipboard.writeText(lines.join("\n"))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="min-h-screen">
       <Header
@@ -78,33 +113,84 @@ export default function IssueDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       ) : (
         <div className="p-6 max-w-4xl">
+          {/* Airbnb 14-day filing deadline — only meaningful for claimable types */}
+          {issue.job && AIRBNB_CLAIMABLE_TYPES.has(issue.type) && (() => {
+            const daysLeft = daysLeftToFile(issue.job.scheduledDate)
+            const expired = daysLeft < 0
+            const urgent = daysLeft >= 0 && daysLeft <= 3
+            return (
+              <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-5">
+                <div className={`flex items-center gap-3 rounded-2xl p-4 border ${
+                  expired ? "bg-slate-100 border-slate-200" : urgent ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
+                }`}>
+                  <Clock className={`w-5 h-5 flex-shrink-0 ${expired ? "text-slate-400" : urgent ? "text-red-600" : "text-amber-600"}`} />
+                  <div>
+                    <p className={`text-sm font-semibold ${expired ? "text-slate-600" : urgent ? "text-red-900" : "text-amber-900"}`}>
+                      {expired
+                        ? "Airbnb's 14-day filing window has closed"
+                        : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left to file with Airbnb`}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${expired ? "text-slate-500" : urgent ? "text-red-700" : "text-amber-700"}`}>
+                      {expired
+                        ? "Reimbursement requests must be filed within 14 days of guest checkout."
+                        : "File in the Resolution Center within 14 days of guest checkout, or before your next guest checks in — whichever is sooner."}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )
+          })()}
+
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Main */}
             <div className="lg:col-span-2 space-y-5">
               {/* Summary card */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
                 <Card>
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <TriangleAlert className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${SEVERITY_CONFIG[issue.severity]?.className}`}>
-                          {SEVERITY_CONFIG[issue.severity]?.label} Severity
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                          {TYPE_LABELS[issue.type] ?? issue.type}
-                        </span>
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <TriangleAlert className="w-5 h-5 text-amber-600" />
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">{formatDateTime(issue.createdAt)}</p>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${SEVERITY_CONFIG[issue.severity]?.className}`}>
+                            {SEVERITY_CONFIG[issue.severity]?.label} Severity
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                            {TYPE_LABELS[issue.type] ?? issue.type}
+                          </span>
+                          {issue.photosConfirmedOriginal && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                              <ShieldCheck className="w-3 h-3" /> Photos confirmed original
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">{formatDateTime(issue.createdAt)}</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
+                  {issue.estimatedCost ? (
+                    <div className="flex items-center gap-2 mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <DollarSign className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <p className="text-sm text-emerald-900">
+                        Estimated cost: <span className="font-bold">${issue.estimatedCost.toFixed(2)}</span>
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="mb-4">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Description</p>
                     <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{issue.description}</p>
                   </div>
+
+                  {AIRBNB_CLAIMABLE_TYPES.has(issue.type) && (
+                    <Button type="button" variant="outline" size="sm" onClick={copyForAirbnb}>
+                      {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                      {copied ? "Copied!" : "Copy for Airbnb Resolution Center"}
+                    </Button>
+                  )}
                 </Card>
               </motion.div>
 

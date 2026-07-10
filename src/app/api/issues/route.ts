@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
-    const { jobId, type, severity, description, photoUrls } = body
+    const { jobId, type, severity, description, photoUrls, estimatedCost, photosConfirmedOriginal } = body
 
     if (!jobId || !type || !description) {
       return NextResponse.json({ error: "jobId, type, and description are required" }, { status: 400 })
@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
         type,
         severity: severity ?? "MEDIUM",
         description,
+        estimatedCost: typeof estimatedCost === "number" ? estimatedCost : null,
+        photosConfirmedOriginal: !!photosConfirmedOriginal,
         photos: {
           create: (photoUrls ?? []).map((url: string) => ({ url })),
         },
@@ -84,13 +86,14 @@ export async function POST(req: NextRequest) {
     const issueUrl = `${APP_URL}/issues/${issue.id}`
     const typeLabel = TYPE_LABELS[type] ?? type
     const severityLabel = SEVERITY_LABELS[severity ?? "MEDIUM"] ?? severity
+    const costSuffix = typeof estimatedCost === "number" ? ` Est. cost: $${estimatedCost.toFixed(2)}.` : ""
 
     await prisma.notification.create({
       data: {
         userId: job.hostId,
         type: "GENERAL",
         title: `Issue Reported — ${job.property?.name}`,
-        message: `${user.name} reported a ${severityLabel.toLowerCase()} severity issue (${typeLabel}) at ${job.property?.name}.`,
+        message: `${user.name} reported a ${severityLabel.toLowerCase()} severity issue (${typeLabel}) at ${job.property?.name}.${costSuffix}`,
       },
     })
 
@@ -106,7 +109,8 @@ export async function POST(req: NextRequest) {
           severityLabel,
           description,
           photoUrls ?? [],
-          issueUrl
+          issueUrl,
+          typeof estimatedCost === "number" ? estimatedCost : null
         ),
       })
     }

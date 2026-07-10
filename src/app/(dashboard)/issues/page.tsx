@@ -139,6 +139,11 @@ export default function IssuesPage() {
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                               {TYPE_LABELS[issue.type] ?? issue.type}
                             </span>
+                            {issue.estimatedCost ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                                ${issue.estimatedCost.toFixed(2)}
+                              </span>
+                            ) : null}
                           </div>
 
                           <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-1">

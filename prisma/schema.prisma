@@ -70,6 +70,19 @@ model Property {
   payments          Payment[]
   issueReports      IssueReport[]
   supplyRequests    SupplyRequest[]
+  supplyItems       PropertySupplyItem[]
+}
+
+// The fixed list a cleaner picks from in Request Supplies — set per property
+// so BigHouse 2040 and Small House 2725 can stock (and thus request) different
+// things, instead of every property sharing one generic hardcoded list.
+model PropertySupplyItem {
+  id         String @id @default(cuid())
+  propertyId String
+  name       String
+  order      Int    @default(0)
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
 model Booking {
@@ -172,6 +185,12 @@ model IssueReport {
   severity     String   @default("MEDIUM") // LOW, MEDIUM, HIGH
   description  String
   status       String   @default("OPEN") // OPEN, REVIEWED, RESOLVED
+  // Airbnb's Resolution Center / AirCover claim fields — estimated repair or
+  // replacement cost, and the cleaner's attestation that photos are original
+  // camera captures (Airbnb bans AI-generated/edited images in claims as of
+  // its April 2026 policy update).
+  estimatedCost           Float?
+  photosConfirmedOriginal Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

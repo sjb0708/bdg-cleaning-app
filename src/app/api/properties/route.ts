@@ -15,6 +15,7 @@ export async function GET() {
         },
         bookings: { orderBy: { checkOut: "asc" } },
         checklistTemplate: { include: { items: { orderBy: { order: "asc" } } } },
+        supplyItems: { orderBy: { order: "asc" } },
       },
       orderBy: { createdAt: "asc" },
     })

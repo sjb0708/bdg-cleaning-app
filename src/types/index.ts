@@ -50,6 +50,14 @@ export interface Property {
   jobs?: Job[]
   bookings?: Booking[]
   checklistTemplate?: ChecklistTemplate | null
+  supplyItems?: PropertySupplyItem[]
+}
+
+export interface PropertySupplyItem {
+  id: string
+  propertyId: string
+  name: string
+  order: number
 }
 
 export interface Booking {
@@ -142,6 +150,8 @@ export interface IssueReport {
   severity: IssueSeverity
   description: string
   status: IssueStatus
+  estimatedCost?: number | null
+  photosConfirmedOriginal?: boolean
   createdAt: string
   updatedAt: string
   job?: { id: string; scheduledDate: string }

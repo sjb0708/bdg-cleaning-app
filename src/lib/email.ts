@@ -289,9 +289,14 @@ export function issueReportedEmail(
   severity: string,
   description: string,
   photoUrls: string[],
-  issueUrl: string
+  issueUrl: string,
+  estimatedCost: number | null = null
 ) {
   const severityColor = severity === "High" ? "#dc2626" : severity === "Medium" ? "#d97706" : "#16a34a"
+  const costBlock = estimatedCost
+    ? `<p style="margin: 0 0 6px; color: #64748b; font-size: 14px;">ESTIMATED COST</p>
+       <p style="margin: 0 0 12px; font-weight: bold; color: #0f172a;">$${estimatedCost.toFixed(2)}</p>`
+    : ""
   const photosHtml = photoUrls.length
     ? `<div style="margin: 16px 0;">
         <p style="margin: 0 0 8px; color: #64748b; font-size: 14px;">PHOTOS</p>
@@ -315,7 +320,8 @@ export function issueReportedEmail(
           <p style="margin: 0 0 6px; color: #64748b; font-size: 14px;">SEVERITY</p>
           <p style="margin: 0 0 12px; font-weight: bold; color: ${severityColor};">${severity}</p>
           <p style="margin: 0 0 6px; color: #64748b; font-size: 14px;">DESCRIPTION</p>
-          <p style="margin: 0; color: #0f172a;">${description}</p>
+          <p style="margin: 0 0 12px; color: #0f172a;">${description}</p>
+          ${costBlock}
           ${photosHtml}
         </div>
         <a href="${issueUrl}" style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">

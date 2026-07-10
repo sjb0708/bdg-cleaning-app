@@ -735,15 +735,26 @@ const SEVERITY_OPTIONS = [
   { value: "HIGH", label: "High", color: "text-red-600 bg-red-50 border-red-200" },
 ]
 
+// Airbnb's Resolution Center / AirCover only pays out on guest-caused damage
+// — these categories are excluded no matter how well-documented.
+const AIRBNB_EXCLUDED_TYPES = new Set(["DAMAGE", "BROKEN_ITEM", "STAIN", "PEST"])
+
 function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onClose: () => void; onSubmitted: () => void }) {
   const [type, setType] = useState("DAMAGE")
   const [severity, setSeverity] = useState("MEDIUM")
   const [description, setDescription] = useState("")
+  const [estimatedCost, setEstimatedCost] = useState("")
+  const [photosConfirmedOriginal, setPhotosConfirmedOriginal] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Airbnb requires an attestation that claim photos are original camera
+  // captures, not gallery picks or AI-edited images — only relevant once a
+  // photo is actually attached to a claimable (non-"Other") report.
+  const needsPhotoAttestation = photos.length > 0 && AIRBNB_EXCLUDED_TYPES.has(type)
 
   function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -762,6 +773,10 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!description.trim()) { setError("Please add a description."); return }
+    if (needsPhotoAttestation && !photosConfirmedOriginal) {
+      setError("Please confirm the photos are original before submitting.")
+      return
+    }
     setSubmitting(true)
     setError("")
     try {
@@ -782,7 +797,15 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
       const res = await fetch("/api/issues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId, type, severity, description, photoUrls }),
+        body: JSON.stringify({
+          jobId,
+          type,
+          severity,
+          description,
+          photoUrls,
+          estimatedCost: estimatedCost.trim() ? parseFloat(estimatedCost) : null,
+          photosConfirmedOriginal,
+        }),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -866,7 +889,32 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
                 required
                 className="w-full px-3 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
               />
+              {AIRBNB_EXCLUDED_TYPES.has(type) && (
+                <p className="text-xs text-slate-400 mt-1.5">
+                  Note: normal wear and tear, consumables, and stains from an authorized guest usually aren't eligible for Airbnb reimbursement.
+                </p>
+              )}
             </div>
+
+            {/* Estimated cost — feeds the host's Airbnb Resolution Center claim */}
+            {AIRBNB_EXCLUDED_TYPES.has(type) && (
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">Estimated repair or replacement cost (optional)</p>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={estimatedCost}
+                    onChange={(e) => setEstimatedCost(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Photos */}
             <div>
@@ -904,14 +952,30 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
                 className="hidden"
                 onChange={handlePhotoPick}
               />
-              <p className="text-xs text-slate-400 mt-1.5">Tap "Add" to take a photo or choose from your gallery</p>
+              <p className="text-xs text-slate-400 mt-1.5">
+                Take fresh photos now — a wide shot of the room plus a close-up of the damage. Airbnb requires original, unedited camera photos for a claim; edited or AI-touched images can void it.
+              </p>
             </div>
+
+            {needsPhotoAttestation && (
+              <label className="flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={photosConfirmedOriginal}
+                  onChange={(e) => setPhotosConfirmedOriginal(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-amber-600"
+                />
+                <span className="text-sm text-amber-900">
+                  I confirm these photos are original, unedited, and taken directly during this visit — not from my gallery or AI-generated.
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Footer */}
           <div className="px-5 pb-5 pt-2 border-t border-slate-100 flex gap-3">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600" disabled={submitting}>
+            <Button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600" disabled={submitting || (needsPhotoAttestation && !photosConfirmedOriginal)}>
               {submitting ? <Spinner size="sm" /> : <><TriangleAlert className="w-4 h-4" /> Submit Report</>}
             </Button>
           </div>
@@ -922,15 +986,21 @@ function ReportIssueModal({ jobId, onClose, onSubmitted }: { jobId: string; onCl
 }
 
 // ─── Request Supplies modal (cleaner) ─────────────────────────────────────────
+// Options come from the property's own supply list (set by the host on the
+// Property page), not a hardcoded list — different properties can stock and
+// offer different supplies.
 
-const PRESET_SUPPLIES = [
-  "Bed Linens", "Towels", "Hand Towels", "Washcloths",
-  "Toilet Paper", "Paper Towels", "Bleach", "Multi-Surface Cleaner",
-  "Dish Soap", "Laundry Detergent", "Trash Bags", "Sponges",
-  "Hand Soap", "Shampoo / Conditioner", "Coffee / Tea", "Other",
-]
-
-function RequestSuppliesModal({ jobId, onClose, onSubmitted }: { jobId: string; onClose: () => void; onSubmitted: () => void }) {
+function RequestSuppliesModal({
+  jobId,
+  supplyOptions,
+  onClose,
+  onSubmitted,
+}: {
+  jobId: string
+  supplyOptions: string[]
+  onClose: () => void
+  onSubmitted: () => void
+}) {
   const [selected, setSelected] = useState<string[]>([])
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -993,22 +1063,28 @@ function RequestSuppliesModal({ jobId, onClose, onSubmitted }: { jobId: string; 
             <div>
               <p className="text-sm font-medium text-slate-700 mb-1">Select supplies needed</p>
               <p className="text-xs text-slate-400 mb-3">Tap items to select. The host will be notified to restock.</p>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_SUPPLIES.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => toggle(item)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                      selected.includes(item)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+              {supplyOptions.length === 0 ? (
+                <p className="text-sm text-slate-400 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                  Your host hasn't set up a supply list for this property yet.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {supplyOptions.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => toggle(item)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                        selected.includes(item)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -1448,6 +1524,7 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
       {showRequestSupplies && (
         <RequestSuppliesModal
           jobId={job.id}
+          supplyOptions={(job.property?.supplyItems ?? []).map((s) => s.name)}
           onClose={() => setShowRequestSupplies(false)}
           onSubmitted={() => { setShowRequestSupplies(false); setSupplySubmitted(true) }}
         />
