@@ -249,12 +249,6 @@ const PAYMENT_METHODS = [
   { value: "Other", label: "Other" },
 ]
 
-const NOTIFICATION_CHANNELS = [
-  { value: "EMAIL", label: "Email only" },
-  { value: "TEXT", label: "Text only" },
-  { value: "BOTH", label: "Email + Text" },
-]
-
 interface EditCleanerModalProps {
   user: User | null
   onClose: () => void
@@ -263,7 +257,7 @@ interface EditCleanerModalProps {
 
 function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", carrier: "", notificationChannel: "EMAIL", paymentMethod: "", paymentDetails: "",
+    name: "", email: "", phone: "", carrier: "", paymentMethod: "", paymentDetails: "",
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -275,7 +269,6 @@ function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
         email: user.email,
         phone: user.phone || "",
         carrier: user.carrier || "",
-        notificationChannel: user.notificationChannel || "EMAIL",
         paymentMethod: user.paymentMethod || "",
         paymentDetails: user.paymentDetails || "",
       })
@@ -330,13 +323,11 @@ function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
             value={form.carrier}
             onChange={(e) => setForm((f) => ({ ...f, carrier: e.target.value }))}
             options={CARRIER_OPTIONS} />
-          <Select label="Notification Preference"
-            value={form.notificationChannel}
-            onChange={(e) => setForm((f) => ({ ...f, notificationChannel: e.target.value }))}
-            options={NOTIFICATION_CHANNELS} />
-          {(form.notificationChannel === "TEXT" || form.notificationChannel === "BOTH") && !form.carrier && (
-            <p className="text-xs text-amber-600 -mt-2">Pick a carrier above so texts actually go out — without it this falls back to email only.</p>
-          )}
+          <p className="text-xs text-slate-400 -mt-2">
+            {form.carrier
+              ? "Job offers and updates go out by email and text together."
+              : "No carrier set — job offers and updates go out by email only. Pick a carrier above to also send free texts."}
+          </p>
           <Select label="Payment Method"
             value={form.paymentMethod}
             onChange={(e) => setForm((f) => ({ ...f, paymentMethod: e.target.value }))}
@@ -519,12 +510,10 @@ function UserCard({ user, pending, onApprove, onReject, onDeactivate, onEdit, on
                 <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 mt-1 border-t border-slate-50 text-xs text-slate-500">
                   <span>
                     Notify: <span className="font-medium text-slate-700">
-                      {user.notificationChannel === "TEXT" ? "Text only" : user.notificationChannel === "BOTH" ? "Email + Text" : "Email only"}
+                      {user.carrier ? "Email + Text" : "Email only"}
                     </span>
-                    {(user.notificationChannel === "TEXT" || user.notificationChannel === "BOTH") && (
-                      user.carrier
-                        ? null
-                        : <span className="text-amber-600 font-medium"> (no carrier set — texts won&apos;t send)</span>
+                    {!user.carrier && (
+                      <span className="text-amber-600 font-medium"> (add a carrier to enable free texts)</span>
                     )}
                   </span>
                   <span>
