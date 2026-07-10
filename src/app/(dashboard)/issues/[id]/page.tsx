@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button"
 import { Spinner } from "@/components/ui/Spinner"
 import { Avatar } from "@/components/ui/Avatar"
 import { formatDateTime } from "@/lib/utils"
-import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, X, DollarSign, Copy, Check, ShieldCheck } from "lucide-react"
+import { TriangleAlert, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, X, DollarSign, Copy, Check, ShieldCheck, Printer } from "lucide-react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import type { IssueReport } from "@/types"
@@ -186,10 +186,17 @@ export default function IssueDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
 
                   {AIRBNB_CLAIMABLE_TYPES.has(issue.type) && (
-                    <Button type="button" variant="outline" size="sm" onClick={copyForAirbnb}>
-                      {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                      {copied ? "Copied!" : "Copy for Airbnb Resolution Center"}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={copyForAirbnb}>
+                        {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                        {copied ? "Copied!" : "Copy for Airbnb Resolution Center"}
+                      </Button>
+                      <Link href={`/issues/${issue.id}/print`} target="_blank">
+                        <Button type="button" variant="outline" size="sm">
+                          <Printer className="w-4 h-4" /> Print Report / Save as PDF
+                        </Button>
+                      </Link>
+                    </div>
                   )}
                 </Card>
               </motion.div>
