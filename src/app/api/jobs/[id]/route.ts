@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { assignCleanerToJob, completeJob, isSameDayTurnover, ensureJobForBooking } from "@/lib/jobs"
-import { sendEmail, jobStartedEmail } from "@/lib/email"
 import { format } from "date-fns"
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 // After a job is cancelled, its booking still needs a cleaner unless the
 // checkout already passed — recreate an UNASSIGNED job so it doesn't
@@ -62,11 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const existing = await prisma.job.findUnique({
       where: { id },
-      include: {
-        property: true,
-        host: { select: { id: true, name: true, email: true, emailNotifications: true } },
-        cleaner: { select: { id: true, name: true, email: true } },
-      },
+      include: { property: true },
     })
     if (!existing) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
@@ -76,7 +69,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const updateData: Record<string, unknown> = {}
     const isAssigning = user.role === "ADMIN" && body.cleanerId && body.cleanerId !== existing.cleanerId
     const isCompleting = body.markComplete === true || body.status === "COMPLETED"
-    const isStarting = user.role === "CLEANER" && body.status === "IN_PROGRESS" && existing.status === "ASSIGNED"
 
     if (user.role === "ADMIN") {
       if (body.status !== undefined) updateData.status = body.status
@@ -96,9 +88,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    // Cleaners can start cleaning (ASSIGNED → IN_PROGRESS)
-    if (isStarting) updateData.status = "IN_PROGRESS"
-
     // Completion and assignment run through shared helpers so side effects
     // (payment, token, notifications, email) are identical on every path
     if (isCompleting || isAssigning) delete updateData.status
@@ -107,32 +96,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (isCompleting) await completeJob(id)
     if (isAssigning) await assignCleanerToJob(id, body.cleanerId)
-
-    if (isStarting) {
-      const dateStr = format(new Date(existing.scheduledDate), "EEEE, MMMM d")
-      await prisma.notification.create({
-        data: {
-          userId: existing.hostId,
-          jobId: id,
-          type: "GENERAL",
-          title: "Cleaner Has Arrived",
-          message: `${existing.cleaner?.name ?? "The cleaner"} checked in and started cleaning at ${existing.property?.name} on ${dateStr}.`,
-        },
-      })
-      if (existing.host?.emailNotifications && existing.host.email) {
-        await sendEmail({
-          to: existing.host.email,
-          subject: `${existing.cleaner?.name ?? "Cleaner"} started cleaning at ${existing.property?.name}`,
-          html: jobStartedEmail(
-            existing.host.name,
-            existing.cleaner?.name ?? "The cleaner",
-            existing.property?.name ?? "",
-            dateStr,
-            `${APP_URL}/jobs/${id}`
-          ),
-        })
-      }
-    }
 
     const job = await prisma.job.findUnique({
       where: { id },

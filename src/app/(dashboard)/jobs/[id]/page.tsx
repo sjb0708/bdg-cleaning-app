@@ -1343,10 +1343,11 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
         </div>
       </motion.div>
 
-      {/* Accept / Decline for pending jobs, and Start Cleaning check-in — both
-          gate the checklist below, so they come first, not buried under it */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="space-y-3">
-        {job.status === "PENDING_ACCEPTANCE" && (
+      {/* Accept / Decline for pending jobs — gates the checklist below, so it
+          comes first, not buried under it. No separate "arrived" check-in
+          step: accepting unlocks the checklist directly. */}
+      {job.status === "PENDING_ACCEPTANCE" && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
@@ -1373,18 +1374,8 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
               </Button>
             </div>
           </div>
-        )}
-
-        {job.status === "ASSIGNED" && (
-          <Button
-            className="w-full min-h-[52px] text-base"
-            onClick={() => updateStatus("IN_PROGRESS")}
-            disabled={updatingStatus}
-          >
-            {updatingStatus ? <Spinner size="sm" /> : "Start Cleaning — I'm Here"}
-          </Button>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Checklist */}
       {checklist.length > 0 && (
@@ -1399,12 +1390,10 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
               <p className="text-xs text-slate-400 mt-1.5">{pct}% complete</p>
             </div>
 
-            {(job.status === "PENDING_ACCEPTANCE" || job.status === "ASSIGNED") && (
+            {job.status === "PENDING_ACCEPTANCE" && (
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center gap-3">
                 <Lock className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                <p className="text-sm text-slate-500">
-                  {job.status === "PENDING_ACCEPTANCE" ? "Accept the job to unlock the checklist." : "Tap “Start Cleaning” above once you've checked in."}
-                </p>
+                <p className="text-sm text-slate-500">Accept the job to unlock the checklist.</p>
               </div>
             )}
 
@@ -1437,7 +1426,7 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
                     <button
                       key={item.id}
                       onClick={() => toggleItem(item)}
-                      disabled={savingId === item.id || job.status !== "IN_PROGRESS"}
+                      disabled={savingId === item.id || job.status === "PENDING_ACCEPTANCE" || job.status === "COMPLETED"}
                       className="w-full flex items-center gap-4 px-4 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left min-h-[56px] disabled:opacity-70"
                     >
                       {savingId === item.id ? (
@@ -1460,7 +1449,7 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
 
       {/* Action buttons */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="space-y-3">
-        {job.status === "IN_PROGRESS" && (
+        {(job.status === "ASSIGNED" || job.status === "IN_PROGRESS") && (
           <Button
             className="w-full min-h-[52px] text-base"
             disabled={!allDone || updatingStatus}
@@ -1469,7 +1458,7 @@ function CleanerJobDetail({ job: initialJob }: { job: Job }) {
             {updatingStatus ? (
               <Spinner size="sm" />
             ) : allDone ? (
-              "Mark Job Complete"
+              "Completed — Ready for Payment"
             ) : (
               `Complete checklist first (${pct}%)`
             )}
