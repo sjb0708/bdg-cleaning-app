@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { isSameDay } from "date-fns"
+import Link from "next/link"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,8 +143,13 @@ interface BookingRowProps {
 }
 
 function BookingRow({ booking, nextBooking, onCreateJob }: BookingRowProps) {
-  const hasJob = (booking.jobs?.length ?? 0) > 0
-  const assignedJob = booking.jobs?.[0]
+  // A job row exists for every synced booking the moment it's created
+  // (auto-created UNASSIGNED, waiting on a cleaner) — that's not the same as
+  // a cleaning actually being assigned. Only count it as assigned once it
+  // has a cleaner and isn't cancelled.
+  const activeJob = booking.jobs?.find((j) => j.status !== "CANCELLED")
+  const isAssigned = !!activeJob && !!activeJob.cleanerId && activeJob.status !== "UNASSIGNED"
+  const needsCleaner = !!activeJob && !isAssigned
   const isPast = new Date(booking.checkOut) < new Date()
   const sameDayTurnover =
     !isPast &&
@@ -152,7 +158,7 @@ function BookingRow({ booking, nextBooking, onCreateJob }: BookingRowProps) {
   const platform = booking.platform?.toLowerCase()
 
   return (
-    <div className={`p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors ${isPast && !hasJob ? "opacity-60" : ""}`}>
+    <div className={`p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors ${isPast && !activeJob ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           {/* Dates row */}
@@ -191,17 +197,22 @@ function BookingRow({ booking, nextBooking, onCreateJob }: BookingRowProps) {
               job was never going to get one (we don't create jobs for the
               past); showing it as an urgent amber warning was misleading */}
           <div>
-            {hasJob && assignedJob ? (
+            {isAssigned ? (
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                 <span className="text-xs text-emerald-700 font-medium">
                   Cleaning assigned
-                  {assignedJob.cleaner ? ` · ${assignedJob.cleaner.name}` : ""}
+                  {activeJob?.cleaner ? ` · ${activeJob.cleaner.name}` : ""}
                 </span>
               </div>
             ) : isPast ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400 font-medium">Past booking — no cleaning was scheduled</span>
+              </div>
+            ) : needsCleaner ? (
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <span className="text-xs text-amber-700 font-medium">Needs a cleaner assigned</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -214,11 +225,17 @@ function BookingRow({ booking, nextBooking, onCreateJob }: BookingRowProps) {
 
         {/* Action */}
         <div className="flex-shrink-0">
-          {hasJob ? (
+          {isAssigned ? (
             <span className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100">
               Scheduled
             </span>
-          ) : isPast ? null : (
+          ) : isPast ? null : needsCleaner && activeJob ? (
+            <Link href={`/jobs/${activeJob.id}`}>
+              <Button size="sm" variant="outline" className="whitespace-nowrap">
+                Assign Cleaner
+              </Button>
+            </Link>
+          ) : (
             <Button
               size="sm"
               onClick={() => onCreateJob(booking)}
