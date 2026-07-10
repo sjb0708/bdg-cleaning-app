@@ -30,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (isSelf || isAdmin) {
       if (body.name !== undefined) updateData.name = body.name
       if (body.phone !== undefined) updateData.phone = body.phone || null
+      if (body.carrier !== undefined) updateData.carrier = body.carrier || null
       if (body.location !== undefined) updateData.location = body.location || null
       if (body.bio !== undefined) updateData.bio = body.bio || null
       if (body.emailNotifications !== undefined) updateData.emailNotifications = body.emailNotifications
@@ -56,6 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         email: true,
         role: true,
         phone: true,
+        carrier: true,
         location: true,
         bio: true,
         avatarUrl: true,

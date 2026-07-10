@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal"
 import { Input } from "@/components/ui/Input"
 import { Select } from "@/components/ui/Select"
 import { formatDate } from "@/lib/utils"
+import { CARRIER_OPTIONS } from "@/lib/carriers"
 import type { User } from "@/types"
 import {
   UserCheck, UserX, Users, Mail, Phone, MapPin,
@@ -262,7 +263,7 @@ interface EditCleanerModalProps {
 
 function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", notificationChannel: "EMAIL", paymentMethod: "", paymentDetails: "",
+    name: "", email: "", phone: "", carrier: "", notificationChannel: "EMAIL", paymentMethod: "", paymentDetails: "",
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -273,6 +274,7 @@ function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
         name: user.name,
         email: user.email,
         phone: user.phone || "",
+        carrier: user.carrier || "",
         notificationChannel: user.notificationChannel || "EMAIL",
         paymentMethod: user.paymentMethod || "",
         paymentDetails: user.paymentDetails || "",
@@ -324,11 +326,17 @@ function EditCleanerModal({ user, onClose, onSaved }: EditCleanerModalProps) {
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} required />
           <Input label="Phone" type="tel" value={form.phone} icon={Phone}
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          <Select label="Carrier"
+            value={form.carrier}
+            onChange={(e) => setForm((f) => ({ ...f, carrier: e.target.value }))}
+            options={CARRIER_OPTIONS} />
           <Select label="Notification Preference"
             value={form.notificationChannel}
             onChange={(e) => setForm((f) => ({ ...f, notificationChannel: e.target.value }))}
             options={NOTIFICATION_CHANNELS} />
-          <p className="text-xs text-slate-400 -mt-2">Text isn&apos;t live yet — this is saved and ready for when it is.</p>
+          {(form.notificationChannel === "TEXT" || form.notificationChannel === "BOTH") && !form.carrier && (
+            <p className="text-xs text-amber-600 -mt-2">Pick a carrier above so texts actually go out — without it this falls back to email only.</p>
+          )}
           <Select label="Payment Method"
             value={form.paymentMethod}
             onChange={(e) => setForm((f) => ({ ...f, paymentMethod: e.target.value }))}
@@ -513,6 +521,11 @@ function UserCard({ user, pending, onApprove, onReject, onDeactivate, onEdit, on
                     Notify: <span className="font-medium text-slate-700">
                       {user.notificationChannel === "TEXT" ? "Text only" : user.notificationChannel === "BOTH" ? "Email + Text" : "Email only"}
                     </span>
+                    {(user.notificationChannel === "TEXT" || user.notificationChannel === "BOTH") && (
+                      user.carrier
+                        ? null
+                        : <span className="text-amber-600 font-medium"> (no carrier set — texts won&apos;t send)</span>
+                    )}
                   </span>
                   <span>
                     Pay via: <span className="font-medium text-slate-700">

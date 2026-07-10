@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       include: {
         property: true,
         host: { select: { id: true, name: true, email: true, emailNotifications: true } },
-        cleaner: { select: { id: true, name: true, email: true, phone: true, notificationChannel: true, emailNotifications: true } },
+        cleaner: { select: { id: true, name: true, email: true, phone: true, carrier: true, notificationChannel: true, emailNotifications: true } },
       },
     })
 

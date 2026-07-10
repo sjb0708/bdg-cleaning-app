@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         approved: true,
       },
       select: {
-        id: true, name: true, email: true, role: true, phone: true,
+        id: true, name: true, email: true, role: true, phone: true, carrier: true,
         location: true, bio: true, avatarUrl: true, approved: true, createdAt: true,
       },
     })
@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
         email: true,
         role: true,
         phone: true,
+        carrier: true,
         location: true,
         bio: true,
         avatarUrl: true,
